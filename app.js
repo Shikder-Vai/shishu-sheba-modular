@@ -13,9 +13,10 @@ app.set("trust proxy", 1);
 // === CORS ===
 const allowedOrigins = [
   "http://localhost:5173",
+  // "http://localhost:5000",
   // "https://shishu-sheba.netlify.app",
-  // "https://shishuseba.com",
-  // "https://www.shishuseba.com",
+  "https://shishuseba.com",
+  "https://www.shishuseba.com",
   // "https://shishu-sheba-server.onrender.com",
 ];
 
@@ -44,19 +45,6 @@ app.use(
   })
 );
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    exposedHeaders: ["set-cookie"],
-  })
-);
-
 // === Middleware ===
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
@@ -73,6 +61,7 @@ app.use("/v1/banner", require("./routes/banner.routes"));
 app.use("/v1/youtube", require("./routes/youtube.routes"));
 app.use("/v1/categories", require("./routes/category.routes"));
 app.use("/v1/reports", require("./routes/orderReportsRoutes"));
+app.use("/v1/blogs", require("./routes/blog.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {
