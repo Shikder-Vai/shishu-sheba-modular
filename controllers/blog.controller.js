@@ -1,7 +1,7 @@
 const { ObjectId } = require("mongodb");
 const client = require("../config/db"); // Assuming you have a MongoDB client exported here
 
-const blogCollection = client.db("shishuSheba").collection("blogs");
+const blogCollection = client.db("sishuSheba").collection("blogs");
 
 // CREATE a new blog post
 exports.createBlogPost = async (req, res) => {
@@ -9,9 +9,13 @@ exports.createBlogPost = async (req, res) => {
     const blog = req.body;
     blog.createdAt = new Date();
     const result = await blogCollection.insertOne(blog);
-    res.status(201).json({ message: "Blog post created", insertedId: result.insertedId });
+    res
+      .status(201)
+      .json({ message: "Blog post created", insertedId: result.insertedId });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create blog post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to create blog post", error: error.message });
   }
 };
 
@@ -21,7 +25,9 @@ exports.getAllBlogPosts = async (req, res) => {
     const blogs = await blogCollection.find().sort({ createdAt: -1 }).toArray();
     res.status(200).json(blogs);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch blog posts", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch blog posts", error: error.message });
   }
 };
 
@@ -34,7 +40,9 @@ exports.getBlogPostById = async (req, res) => {
     if (!blog) return res.status(404).json({ message: "Blog post not found" });
     res.status(200).json(blog);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch blog post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch blog post", error: error.message });
   }
 };
 
@@ -55,7 +63,9 @@ exports.updateBlogPost = async (req, res) => {
 
     res.status(200).json({ message: "Blog post updated" });
   } catch (error) {
-    res.status(500).json({ message: "Failed to update blog post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to update blog post", error: error.message });
   }
 };
 
@@ -72,6 +82,8 @@ exports.deleteBlogPost = async (req, res) => {
 
     res.status(200).json({ message: "Blog post deleted" });
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete blog post", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete blog post", error: error.message });
   }
 };
