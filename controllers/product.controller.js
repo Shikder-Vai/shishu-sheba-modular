@@ -16,19 +16,27 @@ exports.addProduct = async (req, res) => {
 
 exports.getAllProducts = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, category } = req.query;
 
     let query = {};
-    if (req.query.category) {
-      query.category = req.query.category;
+    if (category) {
+      query.category = category;
     }
 
-    const products = await productCollection.find(query).skip(skip).limit(limit).toArray();
-    const total = await productCollection.countDocuments(query);
+    if (page && limit) {
+      const pageNum = parseInt(page) || 1;
+      const limitNum = parseInt(limit) || 10;
+      const skip = (pageNum - 1) * limitNum;
 
-    res.send({ products, total });
+      const products = await productCollection.find(query).skip(skip).limit(limitNum).toArray();
+      const total = await productCollection.countDocuments(query);
+
+      return res.send({ products, total });
+    } else {
+      const products = await productCollection.find(query).toArray();
+      // For non-paginated requests, return the array directly for backward compatibility
+      return res.send(products);
+    }
   } catch (error) {
     console.error("Error fetching products:", error);
     res.status(500).send({ error: "Internal Server Error" });

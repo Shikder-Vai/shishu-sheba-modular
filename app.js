@@ -62,6 +62,7 @@ app.use("/v1/youtube", require("./routes/youtube.routes"));
 app.use("/v1/categories", require("./routes/category.routes"));
 app.use("/v1/reports", require("./routes/orderReportsRoutes"));
 app.use("/v1/blogs", require("./routes/blog.routes"));
+app.use("/v1/reviews", require("./routes/review.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {
