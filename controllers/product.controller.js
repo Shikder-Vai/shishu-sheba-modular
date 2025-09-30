@@ -16,8 +16,19 @@ exports.addProduct = async (req, res) => {
 
 exports.getAllProducts = async (req, res) => {
   try {
-    const result = await productCollection.find().toArray();
-    res.send(result);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    let query = {};
+    if (req.query.category) {
+      query.category = req.query.category;
+    }
+
+    const products = await productCollection.find(query).skip(skip).limit(limit).toArray();
+    const total = await productCollection.countDocuments(query);
+
+    res.send({ products, total });
   } catch (error) {
     console.error("Error fetching products:", error);
     res.status(500).send({ error: "Internal Server Error" });
