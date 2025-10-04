@@ -7,7 +7,6 @@ exports.getSalesPerformance = async (req, res) => {
     const { startDate, endDate, district } = req.query;
     const Order = client.db("sishuSheba").collection("orders");
     
-    // Build match conditions dynamically
     const matchConditions = {
       status: 'delivered'
     };
@@ -229,12 +228,23 @@ exports.getCustomerInsights = async (req, res) => {
   }
 };
 
-// Add this new endpoint to get unique districts for the filter dropdown
+// Get unique districts for the filter dropdown using a modern aggregation pipeline
 exports.getUniqueDistricts = async (req, res) => {
   try {
     const Order = client.db("sishuSheba").collection("orders");
-    const districts = await Order.distinct("user.district");
-    res.json(districts.filter(d => d)); // Filter out any null/undefined values
+    
+    const pipeline = [
+      { $match: { "user.district": { $ne: null, $ne: "" } } }, // Ensure district exists
+      { $group: { _id: "$user.district" } },
+      { $sort: { _id: 1 } }, // Sort districts alphabetically
+      { $project: { _id: 0, district: "$_id" } }
+    ];
+
+    const result = await Order.aggregate(pipeline).toArray();
+    // The result is an array of objects like [{district: 'Dhaka'}], so we map it to an array of strings.
+    const districts = result.map(item => item.district);
+
+    res.json(districts);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
