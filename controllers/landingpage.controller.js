@@ -1,22 +1,68 @@
 const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 
-const landingPageCollection = client.db("sishuSheba").collection("landingpage");
+const landingPageCollection = client.db("sishuSheba").collection("landingpages");
 const productCollection = client.db("sishuSheba").collection("products");
-const reviewCollection = client.db("sishuSheba").collection("reviews");
 
-const updateLandingPage = async (req, res) => {
+// Get all landing pages
+const getLandingPages = async (req, res) => {
+  try {
+    const pages = await landingPageCollection.find({}).toArray();
+    res.status(200).send(pages);
+  } catch (error) {
+    console.error("Error fetching landing pages:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+// Get a single landing page by ID
+const getLandingPage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const landingPageData = await landingPageCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!landingPageData) {
+      return res.status(404).send({ message: "Landing page not found." });
+    }
+
+    const { featuredProductId } = landingPageData;
+
+    if (featuredProductId) {
+      const product = await productCollection.findOne({ _id: new ObjectId(featuredProductId) });
+      landingPageData.featuredProduct = product;
+    }
+
+    res.status(200).send(landingPageData);
+  } catch (error) {
+    console.error("Error fetching landing page data:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+// Create a new landing page
+const createLandingPage = async (req, res) => {
   try {
     const content = req.body;
-    const query = { pageName: "main" };
+    const result = await landingPageCollection.insertOne({ ...content, createdAt: new Date() });
+    res.status(201).send({ success: true, insertedId: result.insertedId });
+  } catch (error) {
+    console.error("Error creating landing page:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+};
+
+// Update a landing page
+const updateLandingPage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const content = req.body;
     const updateDoc = {
       $set: {
         ...content,
         updatedAt: new Date(),
       },
     };
-    const options = { upsert: true };
-    const result = await landingPageCollection.updateOne(query, updateDoc, options);
+    const result = await landingPageCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
     res.status(200).send({ success: true, result });
   } catch (error) {
     console.error("Error updating landing page:", error);
@@ -24,61 +70,25 @@ const updateLandingPage = async (req, res) => {
   }
 };
 
-const getLandingPage = async (req, res) => {
+// Delete a landing page
+const deleteLandingPage = async (req, res) => {
   try {
-    const landingPageData = await landingPageCollection.findOne({ pageName: "main" });
-
-    if (!landingPageData) {
-      return res.status(404).send({ message: "Landing page content not set." });
+    const { id } = req.params;
+    const result = await landingPageCollection.deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Landing page not found." });
     }
-
-    const { featuredProductId } = landingPageData;
-
-    if (!featuredProductId) {
-      return res.status(404).send({ message: "No featured product ID is set for the landing page." });
-    }
-
-    const aggregationPipeline = [
-      {
-        $match: {
-          $or: [
-            { _id: ObjectId.isValid(featuredProductId) ? new ObjectId(featuredProductId) : null },
-            { _id: featuredProductId },
-          ],
-        },
-      },
-      {
-        $lookup: {
-          from: "reviews",
-          localField: "_id",
-          foreignField: "productId",
-          as: "reviews",
-        },
-      },
-    ];
-
-    const productWithReviews = await productCollection.aggregate(aggregationPipeline).toArray();
-
-    if (productWithReviews.length === 0) {
-        return res.status(404).send({ message: "Featured product not found." });
-    }
-
-    const response = {
-      ...landingPageData,
-      featuredProduct: productWithReviews[0],
-    };
-
-    res.status(200).send(response);
+    res.status(200).send({ success: true, message: "Landing page deleted successfully." });
   } catch (error) {
-    console.error("Error fetching landing page data:", error);
-    if (error.name === 'BSONTypeError') {
-        return res.status(400).send({ error: "Invalid featured product ID format." });
-    }
+    console.error("Error deleting landing page:", error);
     res.status(500).send({ error: "Internal Server Error" });
   }
 };
 
 module.exports = {
+  getLandingPages,
   getLandingPage,
+  createLandingPage,
   updateLandingPage,
+  deleteLandingPage,
 };
