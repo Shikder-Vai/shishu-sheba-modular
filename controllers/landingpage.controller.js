@@ -28,7 +28,11 @@ const getLandingPage = async (req, res) => {
     const { featuredProductId } = landingPageData;
 
     if (featuredProductId) {
-      const product = await productCollection.findOne({ _id: new ObjectId(featuredProductId) });
+      const query = ObjectId.isValid(featuredProductId)
+        ? { $or: [{ _id: new ObjectId(featuredProductId) }, { _id: featuredProductId }] }
+        : { _id: featuredProductId };
+
+      const product = await productCollection.findOne(query);
       landingPageData.featuredProduct = product;
     }
 
