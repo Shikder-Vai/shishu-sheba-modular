@@ -38,49 +38,77 @@ exports.getBanners = async (req, res) => {
 };
 
 exports.updateBanner = async (req, res) => {
-  const { id } = req.params;
-  const { image } = req.body;
-  const query = { _id: id };
-  const updateDoc = { $set: { image } };
+  try {
+    const { id } = req.params;
+    const { image } = req.body;
 
-  const result = await bannersCollection.updateOne(query, updateDoc);
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid banner ID" });
+    }
 
-  if (result.matchedCount === 0) {
-    return res.status(404).json({ message: "Banner not found" });
+    if (!image || typeof image !== "string") {
+      return res.status(400).send({ error: "Valid image URL is required" });
+    }
+
+    const result = await bannersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { image } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ error: "Banner not found" });
+    }
+
+    res.send({
+      success: true,
+      modifiedCount: result.modifiedCount,
+      message: "Banner updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating banner:", error);
+    res.status(500).send({ error: "Internal server error" });
   }
-
-  res.json({ message: "Banner updated successfully" });
 };
 
-// exports.updateBanner = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { image } = req.body;
+exports.addBanner = async (req, res) => {
+  try {
+    const { image } = req.body;
 
-//     if (!ObjectId.isValid(id)) {
-//       return res.status(400).send({ error: "Invalid banner ID" });
-//     }
+    if (!image || typeof image !== "string") {
+      return res.status(400).send({ error: "Valid image URL is required" });
+    }
 
-//     if (!image || typeof image !== "string") {
-//       return res.status(400).send({ error: "Valid image URL is required" });
-//     }
+    const newBanner = {
+      image,
+      position: 0, // You might want to calculate the position dynamically
+    };
 
-//     const result = await bannersCollection.updateOne(
-//       { _id: new ObjectId(id) },
-//       { $set: { image } }
-//     );
+    const result = await bannersCollection.insertOne(newBanner);
 
-//     if (result.matchedCount === 0) {
-//       return res.status(404).send({ error: "Banner not found" });
-//     }
+    res.status(201).send({ success: true, insertedId: result.insertedId });
+  } catch (error) {
+    console.error("Error adding banner:", error);
+    res.status(500).send({ error: "Internal server error" });
+  }
+};
 
-//     res.send({
-//       success: true,
-//       modifiedCount: result.modifiedCount,
-//       message: "Banner updated successfully",
-//     });
-//   } catch (error) {
-//     console.error("Error updating banner:", error);
-//     res.status(500).send({ error: "Internal server error" });
-//   }
-// };
+exports.deleteBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid banner ID" });
+    }
+
+    const result = await bannersCollection.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ error: "Banner not found" });
+    }
+
+    res.send({ success: true, message: "Banner deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting banner:", error);
+    res.status(500).send({ error: "Internal server error" });
+  }
+};
