@@ -38,34 +38,49 @@ exports.getBanners = async (req, res) => {
 };
 
 exports.updateBanner = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { image } = req.body;
+  const { id } = req.params;
+  const { image } = req.body;
+  const query = { _id: id };
+  const updateDoc = { $set: { image } };
 
-    if (!ObjectId.isValid(id)) {
-      return res.status(400).send({ error: "Invalid banner ID" });
-    }
+  const result = await bannersCollection.updateOne(query, updateDoc);
 
-    if (!image || typeof image !== "string") {
-      return res.status(400).send({ error: "Valid image URL is required" });
-    }
-
-    const result = await bannersCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { image } }
-    );
-
-    if (result.matchedCount === 0) {
-      return res.status(404).send({ error: "Banner not found" });
-    }
-
-    res.send({
-      success: true,
-      modifiedCount: result.modifiedCount,
-      message: "Banner updated successfully",
-    });
-  } catch (error) {
-    console.error("Error updating banner:", error);
-    res.status(500).send({ error: "Internal server error" });
+  if (result.matchedCount === 0) {
+    return res.status(404).json({ message: "Banner not found" });
   }
+
+  res.json({ message: "Banner updated successfully" });
 };
+
+// exports.updateBanner = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { image } = req.body;
+
+//     if (!ObjectId.isValid(id)) {
+//       return res.status(400).send({ error: "Invalid banner ID" });
+//     }
+
+//     if (!image || typeof image !== "string") {
+//       return res.status(400).send({ error: "Valid image URL is required" });
+//     }
+
+//     const result = await bannersCollection.updateOne(
+//       { _id: new ObjectId(id) },
+//       { $set: { image } }
+//     );
+
+//     if (result.matchedCount === 0) {
+//       return res.status(404).send({ error: "Banner not found" });
+//     }
+
+//     res.send({
+//       success: true,
+//       modifiedCount: result.modifiedCount,
+//       message: "Banner updated successfully",
+//     });
+//   } catch (error) {
+//     console.error("Error updating banner:", error);
+//     res.status(500).send({ error: "Internal server error" });
+//   }
+// };
