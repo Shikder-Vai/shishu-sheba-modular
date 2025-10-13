@@ -2,7 +2,7 @@ const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 const usersCollection = client.db("sishuSheba").collection("admin");
 
-// === Register Controller ===
+// === Custom Register Controller ===
 exports.registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
   console.log(role);
