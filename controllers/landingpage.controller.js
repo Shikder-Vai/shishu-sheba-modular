@@ -60,6 +60,15 @@ const updateLandingPage = async (req, res) => {
   try {
     const { id } = req.params;
     const content = req.body;
+    
+    // we can not update the _id field
+    delete content._id;
+
+    // Ensure featuredProductId is a valid ObjectId if it exists
+    if (content.featuredProductId && !ObjectId.isValid(content.featuredProductId)) {
+      delete content.featuredProductId;
+    }
+
     const updateDoc = {
       $set: {
         ...content,
