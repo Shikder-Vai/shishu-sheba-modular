@@ -2,15 +2,78 @@ const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 
 const orderCollection = client.db("sishuSheba").collection("orders");
+const productCollection = client.db("sishuSheba").collection("products");
+const inventoryLogCollection = client.db("sishuSheba").collection("inventory_logs");
 
 exports.createOrder = async (req, res) => {
+  const session = client.startSession();
+  session.startTransaction();
+
   try {
-    const item = req.body;
-    const result = await orderCollection.insertOne(item);
-    res.status(201).send(result);
+    const orderData = req.body;
+    console.log("Received order data:", JSON.stringify(orderData, null, 2));
+
+    // Sanitize item names
+    if (orderData.items && Array.isArray(orderData.items)) {
+      orderData.items.forEach(item => {
+        if (typeof item.name === 'object' && item.name !== null) {
+          item.name = item.name.en || '';
+        }
+      });
+    }
+
+    // Basic validation
+    if (!orderData.items || orderData.items.length === 0) {
+      return res.status(400).send({ error: "Order must contain at least one item." });
+    }
+
+    // Process each item in the order
+    for (const item of orderData.items) {
+      const { sku, quantity } = item;
+
+      // Find the product variant
+      const product = await productCollection.findOne({ "variants.sku": sku }, { session });
+      if (!product) {
+        throw new Error(`Product with SKU ${sku} not found.`);
+      }
+
+      const variant = product.variants.find(v => v.sku === sku);
+      if (variant.stock_quantity < quantity) {
+        throw new Error(`Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`);
+      }
+
+      // Update stock quantity
+      await productCollection.updateOne(
+        { "variants.sku": sku },
+        { $inc: { "variants.$.stock_quantity": -quantity } },
+        { session }
+      );
+
+      // Create inventory log
+      const logEntry = {
+        sku,
+        change_quantity: -quantity,
+        new_quantity: variant.stock_quantity - quantity,
+        reason: "sale",
+        orderId: orderData.orderId, // Assuming orderId is present in the order data
+        timestamp: new Date(),
+      };
+      await inventoryLogCollection.insertOne(logEntry, { session });
+    }
+
+    // Insert the order
+    const result = await orderCollection.insertOne(orderData, { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).send({ success: true, insertedId: result.insertedId });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     console.error("Error creating order:", error);
-    res.status(500).send({ error: "Internal Server Error" });
+    res.status(500).send({ error: "Internal Server Error", message: error.message, stack: error.stack });
   }
 };
 

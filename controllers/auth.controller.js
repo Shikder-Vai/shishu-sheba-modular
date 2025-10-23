@@ -1,6 +1,7 @@
 const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 const usersCollection = client.db("sishuSheba").collection("admin");
+const bcrypt = require("bcryptjs");
 
 // === Custom Register Controller ===
 exports.registerUser = async (req, res) => {
@@ -19,10 +20,12 @@ exports.registerUser = async (req, res) => {
       return res.status(409).json({ message: "User already exists" });
     }
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const newUser = {
       name,
       email,
-      password,
+      password: hashedPassword,
       role: "admin", // Default role
       createdAt: new Date(),
     };
@@ -39,17 +42,22 @@ exports.registerUser = async (req, res) => {
 // === Login Controller ===
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
-  console.log(email, password);
 
   try {
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    const user = await usersCollection.findOne({ email, password });
-    console.log(user);
+    const user = await usersCollection.findOne({ email });
+    
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+        return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Return user

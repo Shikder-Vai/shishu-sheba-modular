@@ -65,6 +65,7 @@ app.use("/v1/blogs", require("./routes/blog.routes"));
 app.use("/v1/reviews", require("./routes/review.routes"));
 app.use("/v1/landing-pages", require("./routes/landingpage.routes"));
 app.use("/v1/upload", require("./routes/upload.routes"));
+app.use("/v1/inventory", require("./routes/inventory.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {

@@ -9,10 +9,12 @@ const {
   updateProduct,
   getSingleProduct,
   deleteProduct,
+  getLowStockProducts,
 } = require("../controllers/product.controller");
 
 router.post("/", addProduct);
 router.get("/", getAllProducts);
+router.get("/low-stock", getLowStockProducts);
 router.get("/:id", getProductById);
 router.get("/single/:id", getSingleProduct);
 router.get("/category/:category", getProductsByCategory);
