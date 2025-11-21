@@ -26,7 +26,7 @@ exports.registerUser = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role: "admin", // Default role
+      role: role || "user", // Default role
       createdAt: new Date(),
     };
 
@@ -49,7 +49,7 @@ exports.loginUser = async (req, res) => {
     }
 
     const user = await usersCollection.findOne({ email });
-    
+
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -57,7 +57,7 @@ exports.loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-        return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     // Return user
@@ -106,17 +106,63 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// === Get All Admins ===
-exports.getAllAdmins = async (req, res) => {
+// === Get All Admin ===
+exports.getAllAdmin = async (req, res) => {
   try {
-    const admins = await usersCollection
+    const admin = await usersCollection
       .find()
       .project({ password: 0 }) // exclude password
       .toArray();
 
-    res.status(200).json(admins);
+    res.status(200).json(admin);
   } catch (error) {
-    console.error("Get Admins Error:", error);
-    res.status(500).json({ message: "Failed to fetch admins" });
+    console.error("Get Admin Error:", error);
+    res.status(500).json({ message: "Failed to fetch admin" });
+  }
+};
+
+// === Update User Role ===
+exports.updateUserRole = async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+
+  try {
+    const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { role } }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(500).json({ message: "Failed to update user role" });
+    }
+
+    res.status(200).json({ message: "User role updated successfully" });
+  } catch (error) {
+    console.error("Update role error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Get User Role ===
+exports.getUserRole = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ role: user.role });
+  } catch (error) {
+    console.error("Get role error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
