@@ -87,11 +87,11 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // if (user.role !== "admin") {
-    //   return res
-    //     .status(403)
-    //     .json({ message: "Cannot delete: user is not an admin" });
-    // }
+    if (user.role === "admin") {
+      return res
+        .status(403)
+        .json({ message: "Cannot delete another admin" });
+    }
 
     const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
 
@@ -99,7 +99,7 @@ exports.deleteUser = async (req, res) => {
       return res.status(500).json({ message: "Failed to delete user" });
     }
 
-    res.status(200).json({ message: "Admin user deleted successfully" });
+    res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Delete error:", error);
     res.status(500).json({ message: "Internal server error" });
