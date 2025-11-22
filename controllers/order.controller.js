@@ -3,7 +3,9 @@ const client = require("../config/db");
 
 const orderCollection = client.db("sishuSheba").collection("orders");
 const productCollection = client.db("sishuSheba").collection("products");
-const inventoryLogCollection = client.db("sishuSheba").collection("inventory_logs");
+const inventoryLogCollection = client
+  .db("sishuSheba")
+  .collection("inventory_logs");
 
 exports.createOrder = async (req, res) => {
   const session = client.startSession();
@@ -15,16 +17,18 @@ exports.createOrder = async (req, res) => {
 
     // Sanitize item names
     if (orderData.items && Array.isArray(orderData.items)) {
-      orderData.items.forEach(item => {
-        if (typeof item.name === 'object' && item.name !== null) {
-          item.name = item.name.en || '';
+      orderData.items.forEach((item) => {
+        if (typeof item.name === "object" && item.name !== null) {
+          item.name = item.name.en || "";
         }
       });
     }
 
     // Basic validation
     if (!orderData.items || orderData.items.length === 0) {
-      return res.status(400).send({ error: "Order must contain at least one item." });
+      return res
+        .status(400)
+        .send({ error: "Order must contain at least one item." });
     }
 
     // Process each item in the order
@@ -32,14 +36,19 @@ exports.createOrder = async (req, res) => {
       const { sku, quantity } = item;
 
       // Find the product variant
-      const product = await productCollection.findOne({ "variants.sku": sku }, { session });
+      const product = await productCollection.findOne(
+        { "variants.sku": sku },
+        { session }
+      );
       if (!product) {
         throw new Error(`Product with SKU ${sku} not found.`);
       }
 
-      const variant = product.variants.find(v => v.sku === sku);
+      const variant = product.variants.find((v) => v.sku === sku);
       if (variant.stock_quantity < quantity) {
-        throw new Error(`Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`);
+        throw new Error(
+          `Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`
+        );
       }
 
       // Update stock quantity
@@ -73,7 +82,13 @@ exports.createOrder = async (req, res) => {
     session.endSession();
 
     console.error("Error creating order:", error);
-    res.status(500).send({ error: "Internal Server Error", message: error.message, stack: error.stack });
+    res
+      .status(500)
+      .send({
+        error: "Internal Server Error",
+        message: error.message,
+        stack: error.stack,
+      });
   }
 };
 
@@ -102,6 +117,65 @@ exports.updateOrder = async (req, res) => {
       cancelBy,
       admin_note,
     } = req.body;
+
+    // Handle plain status-only updates (no other fields provided)
+    if (
+      status &&
+      !approvedBy &&
+      !processBy &&
+      !deliveredBy &&
+      !shippingBy &&
+      !cancelBy &&
+      !admin_note
+    ) {
+      try {
+        if (status === "pending") {
+          // Move back to pending: set status and remove metadata fields
+          const updateResult = await orderCollection.updateOne(
+            { _id: new ObjectId(id) },
+            {
+              $set: { status },
+              $unset: {
+                approvedBy: "",
+                processBy: "",
+                deliveredBy: "",
+                cancelBy: "",
+                shippingBy: "",
+                consignment_id: "",
+                tracking_code: "",
+              },
+            }
+          );
+
+          const updatedOrder = await orderCollection.findOne({
+            _id: new ObjectId(id),
+          });
+          return res.json({
+            success: true,
+            order: updatedOrder,
+            modifiedCount: updateResult.modifiedCount,
+          });
+        }
+
+        // Generic status-only update
+        const updateResult = await orderCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+
+        const updatedOrder = await orderCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        return res.json({
+          success: true,
+          order: updatedOrder,
+          modifiedCount: updateResult.modifiedCount,
+        });
+      } catch (err) {
+        console.error("Status-only update failed:", err);
+        return res.status(500).json({ error: "Update failed" });
+      }
+    }
 
     let result;
 
