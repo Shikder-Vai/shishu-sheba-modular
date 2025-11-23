@@ -82,13 +82,11 @@ exports.createOrder = async (req, res) => {
     session.endSession();
 
     console.error("Error creating order:", error);
-    res
-      .status(500)
-      .send({
-        error: "Internal Server Error",
-        message: error.message,
-        stack: error.stack,
-      });
+    res.status(500).send({
+      error: "Internal Server Error",
+      message: error.message,
+      stack: error.stack,
+    });
   }
 };
 
@@ -116,6 +114,7 @@ exports.updateOrder = async (req, res) => {
       tracking_code,
       cancelBy,
       admin_note,
+      shippingNote,
     } = req.body;
 
     // Handle plain status-only updates (no other fields provided)
@@ -143,6 +142,7 @@ exports.updateOrder = async (req, res) => {
                 shippingBy: "",
                 consignment_id: "",
                 tracking_code: "",
+                shippingNote: "",
               },
             }
           );
@@ -207,6 +207,7 @@ exports.updateOrder = async (req, res) => {
             shippingBy,
             consignment_id,
             tracking_code,
+            ...(shippingNote && { shippingNote }),
           },
         }
       );
