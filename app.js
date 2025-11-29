@@ -7,26 +7,24 @@ const helmet = require("helmet");
 const app = express();
 
 // === Security ===
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.set("trust proxy", 1);
 
 // === CORS ===
 const allowedOrigins = [
   "http://localhost:5173",
-  // "http://localhost:5000",
-  // "https://shishu-sheba.netlify.app",
   "https://shishuseba.com",
+  "www.shishuseba.com",
   "https://www.shishuseba.com",
-  // "https://shishu-sheba-server.onrender.com",
 ];
 
 // Optional: regex pattern matching for preview builds or all localhost ports
 function isAllowedOrigin(origin) {
-  if (!origin) return true; // allow tools like Postman
+  if (!origin) return true;
   return (
     allowedOrigins.includes(origin) ||
-    /^https:\/\/[a-zA-Z0-9-]+--shishu-sheba\.netlify\.app$/.test(origin) || // Netlify preview builds
-    /^http:\/\/localhost:\d+$/.test(origin) // all localhost ports (like 5173, 3000, etc.)
+    /^https:\/\/[a-zA-Z0-9-]+--shishu-sheba\.netlify\.app$/.test(origin) ||
+    /^http:\/\/localhost:\d+$/.test(origin)
   );
 }
 
@@ -49,6 +47,10 @@ app.use(
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Serve uploaded files
+
+app.use("/uploads", express.static("/var/www/uploads"));
 
 // === Rate Limiting for APIs ===
 // app.use("/v1", apiLimiter);

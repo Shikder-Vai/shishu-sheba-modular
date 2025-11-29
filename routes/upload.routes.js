@@ -6,8 +6,10 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 
+const baseUploadDir = "/var/www/uploads";
+
 // --- Landing Page Image Upload ---
-const landingPageUploadDir = path.join(__dirname, "../../shishu-seba-frontend-main/public/uploads/landing-pages");
+const landingPageUploadDir = path.join(baseUploadDir, "landing-pages");
 if (!fs.existsSync(landingPageUploadDir)) {
   fs.mkdirSync(landingPageUploadDir, { recursive: true });
 }
@@ -22,7 +24,7 @@ const uploadLandingPage = multer({ storage: landingPageStorage });
 router.post("/landing-page-image", uploadLandingPage.single("image"), uploadController.uploadLandingPageImage);
 
 // --- Banner Image Upload ---
-const bannerUploadDir = path.join(__dirname, "../../shishu-seba-frontend-main/public/uploads/banners");
+const bannerUploadDir = path.join(baseUploadDir, "banners");
 if (!fs.existsSync(bannerUploadDir)) {
   fs.mkdirSync(bannerUploadDir, { recursive: true });
 }
@@ -37,7 +39,7 @@ const uploadBanner = multer({ storage: bannerStorage });
 router.post("/banner-image", uploadBanner.single("image"), uploadController.uploadBannerImage);
 
 // --- Review Image Upload ---
-const reviewUploadDir = path.join(__dirname, "../../shishu-seba-frontend-main/public/uploads/reviews");
+const reviewUploadDir = path.join(baseUploadDir, "reviews");
 if (!fs.existsSync(reviewUploadDir)) {
   fs.mkdirSync(reviewUploadDir, { recursive: true });
 }
@@ -52,7 +54,7 @@ const uploadReview = multer({ storage: reviewStorage });
 router.post("/review-image", uploadReview.single("image"), uploadController.uploadReviewImage);
 
 // --- Product Image Upload ---
-const productUploadDir = path.join(__dirname, "../../shishu-seba-frontend-main/public/uploads/products");
+const productUploadDir = path.join(baseUploadDir, "products");
 if (!fs.existsSync(productUploadDir)) {
   fs.mkdirSync(productUploadDir, { recursive: true });
 }
