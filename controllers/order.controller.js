@@ -335,3 +335,18 @@ exports.updateFullOrder = async (req, res) => {
     });
   }
 };
+
+exports.deleteOrders = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+    const objectIds = ids.map((id) => new ObjectId(id));
+    const result = await orderCollection.deleteMany({ _id: { $in: objectIds } });
+    res.json({ success: true, deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error("Error deleting orders:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
