@@ -50,7 +50,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Serve uploaded files
 
-app.use("/uploads", express.static("/var/www/uploads"));
+app.use("/uploads", express.static(process.env.UPLOAD_DIR || "uploads"));
 
 // === Rate Limiting for APIs ===
 // app.use("/v1", apiLimiter);

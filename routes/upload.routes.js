@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 
-const baseUploadDir = "/var/www/uploads";
+const baseUploadDir = process.env.UPLOAD_DIR || "uploads";
 
 // --- Landing Page Image Upload ---
 const landingPageUploadDir = path.join(baseUploadDir, "landing-pages");
