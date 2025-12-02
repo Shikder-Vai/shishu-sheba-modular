@@ -3,7 +3,7 @@ const uploadLandingPageImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).send({ error: "No file uploaded." });
     }
-    const imageUrl = `http://localhost:5000/uploads/landing-pages/${req.file.filename}`;
+    const imageUrl = `${process.env.IMG_UPLOAD_URL}/landing-pages/${req.file.filename}`;
     res.status(200).send({ imageUrl });
   } catch (error) {
     console.error("Error uploading landing page image:", error);
@@ -16,7 +16,7 @@ const uploadBannerImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).send({ error: "No file uploaded." });
     }
-    const imageUrl = `http://localhost:5000/uploads/banners/${req.file.filename}`;
+    const imageUrl = `${process.env.IMG_UPLOAD_URL}/banners/${req.file.filename}`;
     res.status(200).send({ imageUrl });
   } catch (error) {
     console.error("Error uploading banner image:", error);
@@ -29,7 +29,7 @@ const uploadReviewImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).send({ error: "No file uploaded." });
     }
-    const imageUrl = `http://localhost:5000/uploads/reviews/${req.file.filename}`;
+    const imageUrl = `${process.env.IMG_UPLOAD_URL}/reviews/${req.file.filename}`;
     res.status(200).send({ imageUrl });
   } catch (error) {
     console.error("Error uploading review image:", error);
@@ -42,7 +42,7 @@ const uploadProductImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).send({ error: "No file uploaded." });
     }
-    const imageUrl = `http://localhost:5000/uploads/products/${req.file.filename}`;
+    const imageUrl = `${process.env.IMG_UPLOAD_URL}/products/${req.file.filename}`;
     res.status(200).send({ imageUrl });
   } catch (error) {
     console.error("Error uploading product image:", error);
