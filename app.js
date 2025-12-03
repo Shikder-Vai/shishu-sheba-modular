@@ -14,7 +14,6 @@ app.set("trust proxy", 1);
 const allowedOrigins = [
   "http://localhost:5173",
   "https://shishuseba.com",
-  "www.shishuseba.com",
   "https://www.shishuseba.com",
 ];
 
