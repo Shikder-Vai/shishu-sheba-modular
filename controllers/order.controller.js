@@ -8,9 +8,6 @@ const inventoryLogCollection = client
   .collection("inventory_logs");
 
 exports.createOrder = async (req, res) => {
-  const session = client.startSession();
-  session.startTransaction();
-
   try {
     const orderData = req.body;
     console.log("Received order data:", JSON.stringify(orderData, null, 2));
@@ -36,10 +33,7 @@ exports.createOrder = async (req, res) => {
       const { sku, quantity } = item;
 
       // Find the product variant
-      const product = await productCollection.findOne(
-        { "variants.sku": sku },
-        { session }
-      );
+      const product = await productCollection.findOne({ "variants.sku": sku });
       if (!product) {
         throw new Error(`Product with SKU ${sku} not found.`);
       }
@@ -54,8 +48,7 @@ exports.createOrder = async (req, res) => {
       // Update stock quantity
       await productCollection.updateOne(
         { "variants.sku": sku },
-        { $inc: { "variants.$.stock_quantity": -quantity } },
-        { session }
+        { $inc: { "variants.$.stock_quantity": -quantity } }
       );
 
       // Create inventory log
@@ -67,20 +60,14 @@ exports.createOrder = async (req, res) => {
         orderId: orderData.orderId, // Assuming orderId is present in the order data
         timestamp: new Date(),
       };
-      await inventoryLogCollection.insertOne(logEntry, { session });
+      await inventoryLogCollection.insertOne(logEntry);
     }
 
     // Insert the order
-    const result = await orderCollection.insertOne(orderData, { session });
-
-    await session.commitTransaction();
-    session.endSession();
+    const result = await orderCollection.insertOne(orderData);
 
     res.status(201).send({ success: true, insertedId: result.insertedId });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
     console.error("Error creating order:", error);
     res.status(500).send({
       error: "Internal Server Error",
