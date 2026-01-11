@@ -2,6 +2,8 @@ const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 const usersCollection = client.db("sishuSheba").collection("admin");
 const bcrypt = require("bcryptjs");
+const { sendEmail } = require("../services/email.service");
+const crypto = require("crypto");
 
 // === Custom Register Controller ===
 exports.registerUser = async (req, res) => {
@@ -88,9 +90,7 @@ exports.deleteUser = async (req, res) => {
     }
 
     if (user.role === "admin") {
-      return res
-        .status(403)
-        .json({ message: "Cannot delete another admin" });
+      return res.status(403).json({ message: "Cannot delete another admin" });
     }
 
     const result = await usersCollection.deleteOne({ _id: new ObjectId(id) });
@@ -163,6 +163,101 @@ exports.getUserRole = async (req, res) => {
     res.status(200).json({ role: user.role });
   } catch (error) {
     console.error("Get role error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Forgot Password ===
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const user = await usersCollection.findOne({ email });
+
+    // Always return success to avoid email enumeration
+    if (!user) {
+      return res
+        .status(200)
+        .json({
+          message:
+            "If an account with that email exists, a reset link has been sent.",
+        });
+    }
+
+    const token = crypto.randomBytes(20).toString("hex");
+    const expires = Date.now() + 3600000; // 1 hour
+
+    await usersCollection.updateOne(
+      { email },
+      { $set: { passwordResetToken: token, passwordResetExpires: expires } }
+    );
+
+    const resetLink = `${
+      process.env.CLIENT_URL || "http://localhost:5173"
+    }/reset-password/${token}`;
+
+    // Send the email
+    await sendEmail(
+      email,
+      "Password Reset Link",
+      `<p>You are receiving this because you (or someone else) have requested the reset of the password for your account.</p>
+       <p>Please click on the following link, or paste this into your browser to complete the process:</p>
+       <a href="${resetLink}">${resetLink}</a>
+       <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
+    );
+
+    res
+      .status(200)
+      .json({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Reset Password ===
+exports.resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res
+      .status(400)
+      .json({ message: "Token and new password are required" });
+  }
+
+  try {
+    const user = await usersCollection.findOne({
+      passwordResetToken: token,
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid token" });
+    }
+
+    if (user.passwordResetExpires < Date.now()) {
+      return res.status(400).json({ message: "Token has expired" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await usersCollection.updateOne(
+      { _id: user._id },
+      {
+        $set: { password: hashedPassword },
+        $unset: { passwordResetToken: "", passwordResetExpires: "" },
+      }
+    );
+
+    res.status(200).json({ message: "Password has been reset successfully" });
+  } catch (error) {
+    console.error("Reset password error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
