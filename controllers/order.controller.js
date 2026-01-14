@@ -134,6 +134,7 @@ exports.updateOrder = async (req, res) => {
       cancelBy,
       admin_note,
       shippingNote,
+      new_note,
     } = req.body;
 
     // Handle plain status-only updates (no other fields provided)
@@ -144,7 +145,8 @@ exports.updateOrder = async (req, res) => {
       !deliveredBy &&
       !shippingBy &&
       !cancelBy &&
-      !admin_note
+      !admin_note &&
+      !new_note
     ) {
       try {
         if (status === "pending") {
@@ -198,10 +200,10 @@ exports.updateOrder = async (req, res) => {
 
     let result;
 
-    if (admin_note) {
+    if (new_note) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { admin_note } }
+        { $push: { admin_notes: new_note } }
       );
     }
     if (approvedBy) {
