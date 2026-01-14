@@ -32,17 +32,50 @@ exports.createOrder = async (req, res) => {
     for (const item of orderData.items) {
       const { sku, quantity } = item;
 
-      // Find the product variant
+      // Find the product that contains the variant with the given SKU
       const product = await productCollection.findOne({ "variants.sku": sku });
       if (!product) {
-        throw new Error(`Product with SKU ${sku} not found.`);
+        // Stop the process and inform the user if a product is not found
+        return res
+          .status(400)
+          .send({ error: `Product with SKU ${sku} not found.` });
+      }
+
+      // Defensive checks for data integrity
+      if (!Array.isArray(product.variants)) {
+        console.error(
+          `Data Integrity Error: Product with ID ${product._id} has a malformed 'variants' field (not an array).`
+        );
+        return res
+          .status(500)
+          .send({ error: "Internal Server Error due to data inconsistency." });
       }
 
       const variant = product.variants.find((v) => v.sku === sku);
-      if (variant.stock_quantity < quantity) {
-        throw new Error(
-          `Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`
+
+      if (!variant) {
+        // This case is unlikely if the product was found, but it's a good safeguard
+        console.error(
+          `Data Integrity Error: SKU ${sku} not found in variants of product ${product._id}, though product was matched.`
         );
+        return res
+          .status(500)
+          .send({ error: "Internal Server Error due to data inconsistency." });
+      }
+
+      if (typeof variant.stock_quantity !== "number") {
+        console.error(
+          `Data Integrity Error: Variant with SKU ${sku} in product ${product._id} is missing 'stock_quantity' or it is not a number.`
+        );
+        return res
+          .status(400)
+          .send({ error: `Product variant with SKU ${sku} is unavailable.` });
+      }
+
+      if (variant.stock_quantity < quantity) {
+        return res.status(400).send({
+          error: `Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`,
+        });
       }
 
       // Update stock quantity
@@ -72,7 +105,6 @@ exports.createOrder = async (req, res) => {
     res.status(500).send({
       error: "Internal Server Error",
       message: error.message,
-      stack: error.stack,
     });
   }
 };
