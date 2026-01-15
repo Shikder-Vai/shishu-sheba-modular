@@ -17,14 +17,25 @@ exports.getAllReviews = async (req, res) => {
 // Add a new review
 exports.addReview = async (req, res) => {
   try {
-    const { imageUrl } = req.body;
-    if (!imageUrl) {
-      return res.status(400).json({ message: "Image URL is required" });
+    const { imageUrl, review, author } = req.body;
+    if (!imageUrl && !review) {
+      return res
+        .status(400)
+        .json({ message: "Review content or image URL is required" });
     }
     const newReview = {
-      imageUrl,
       createdAt: new Date(),
     };
+
+    if (imageUrl) {
+      newReview.imageUrl = imageUrl;
+    }
+
+    if (review) {
+      newReview.review = review;
+      newReview.author = author || "Anonymous";
+    }
+
     const result = await reviewCollection.insertOne(newReview);
     res.status(201).json({ success: true, insertedId: result.insertedId });
   } catch (error) {
