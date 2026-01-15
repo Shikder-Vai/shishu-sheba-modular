@@ -72,11 +72,11 @@ exports.createOrder = async (req, res) => {
           .send({ error: `Product variant with SKU ${sku} is unavailable.` });
       }
 
-      if (variant.stock_quantity < quantity) {
-        return res.status(400).send({
-          error: `Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`,
-        });
-      }
+      // if (variant.stock_quantity < quantity) {
+      //   return res.status(400).send({
+      //     error: `Not enough stock for SKU ${sku}. Available: ${variant.stock_quantity}, Requested: ${quantity}`,
+      //   });
+      // }
 
       // Update stock quantity
       await productCollection.updateOne(
