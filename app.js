@@ -68,6 +68,7 @@ app.use("/v1/landing-pages", require("./routes/landingpage.routes"));
 app.use("/v1/upload", require("./routes/upload.routes"));
 app.use("/v1/inventory", require("./routes/inventory.routes"));
 app.use("/v1/pixel-codes", require("./routes/pixelCode.routes"));
+app.use("/v1/steadfast-api-keys", require("./routes/steadfastApiKeys.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {
