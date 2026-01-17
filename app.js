@@ -39,7 +39,7 @@ app.use(
     },
     credentials: true,
     exposedHeaders: ["set-cookie"],
-  })
+  }),
 );
 
 // === Middleware ===
@@ -67,6 +67,7 @@ app.use("/v1/reviews", require("./routes/review.routes"));
 app.use("/v1/landing-pages", require("./routes/landingpage.routes"));
 app.use("/v1/upload", require("./routes/upload.routes"));
 app.use("/v1/inventory", require("./routes/inventory.routes"));
+app.use("/v1/pixel-codes", require("./routes/pixelCode.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {
