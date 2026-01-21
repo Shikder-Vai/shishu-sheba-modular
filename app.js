@@ -13,6 +13,7 @@ app.set("trust proxy", 1);
 // === CORS ===
 const allowedOrigins = [
   "http://localhost:5173",
+  "https://sstest.shongbad.online",
   "https://shishuseba.com",
   "https://www.shishuseba.com",
 ];

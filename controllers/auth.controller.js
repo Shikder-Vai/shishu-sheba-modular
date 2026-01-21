@@ -135,7 +135,7 @@ exports.updateUserRole = async (req, res) => {
 
     const result = await usersCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { role } }
+      { $set: { role } },
     );
 
     if (result.modifiedCount === 0) {
@@ -180,12 +180,10 @@ exports.forgotPassword = async (req, res) => {
 
     // Always return success to avoid email enumeration
     if (!user) {
-      return res
-        .status(200)
-        .json({
-          message:
-            "If an account with that email exists, a reset link has been sent.",
-        });
+      return res.status(200).json({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
     }
 
     const token = crypto.randomBytes(20).toString("hex");
@@ -193,11 +191,11 @@ exports.forgotPassword = async (req, res) => {
 
     await usersCollection.updateOne(
       { email },
-      { $set: { passwordResetToken: token, passwordResetExpires: expires } }
+      { $set: { passwordResetToken: token, passwordResetExpires: expires } },
     );
 
     const resetLink = `${
-      process.env.CLIENT_URL || "http://localhost:5173"
+      process.env.CLIENT_URL || "https://sstest.shongbad.online"
     }/reset-password/${token}`;
 
     // Send the email
@@ -207,15 +205,13 @@ exports.forgotPassword = async (req, res) => {
       `<p>You are receiving this because you (or someone else) have requested the reset of the password for your account.</p>
        <p>Please click on the following link, or paste this into your browser to complete the process:</p>
        <a href="${resetLink}">${resetLink}</a>
-       <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`
+       <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`,
     );
 
-    res
-      .status(200)
-      .json({
-        message:
-          "If an account with that email exists, a reset link has been sent.",
-      });
+    res.status(200).json({
+      message:
+        "If an account with that email exists, a reset link has been sent.",
+    });
   } catch (error) {
     console.error("Forgot password error:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -252,7 +248,7 @@ exports.resetPassword = async (req, res) => {
       {
         $set: { password: hashedPassword },
         $unset: { passwordResetToken: "", passwordResetExpires: "" },
-      }
+      },
     );
 
     res.status(200).json({ message: "Password has been reset successfully" });
