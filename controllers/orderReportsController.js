@@ -284,7 +284,42 @@ exports.getAllCustomers = async (req, res) => {
           totalSpent: { $sum: "$total" },
           createdAt: { $min: "$orderTimestamp" },
           lastOrderDate: { $max: "$orderTimestamp" },
-          source: { $first: "$orderSource" },
+          sources: { $push: "$orderSource" },
+        },
+      },
+      {
+        $addFields: {
+          // Get unique sources and set default to "website" if empty
+          sources: {
+            $cond: [
+              {
+                $eq: [
+                  {
+                    $size: {
+                      $filter: {
+                        input: "$sources",
+                        as: "src",
+                        cond: { $ne: ["$$src", null] },
+                      },
+                    },
+                  },
+                  0,
+                ],
+              },
+              ["website"],
+              {
+                $setUnion: [
+                  {
+                    $filter: {
+                      input: "$sources",
+                      as: "src",
+                      cond: { $ne: ["$$src", null] },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         },
       },
       {
@@ -344,7 +379,7 @@ exports.getAllCustomers = async (req, res) => {
           totalSpent: 1,
           createdAt: 1,
           lastOrderDate: 1,
-          source: { $ifNull: ["$source", "N/A"] },
+          sources: 1,
           tag: 1,
         },
       },
