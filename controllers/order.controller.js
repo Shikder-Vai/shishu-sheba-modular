@@ -32,19 +32,16 @@ exports.createOrder = async (req, res) => {
     for (const item of orderData.items) {
       const { sku, quantity } = item;
 
-      // Find the product that contains the variant with the given SKU
       const product = await productCollection.findOne({ "variants.sku": sku });
       if (!product) {
-        // Stop the process and inform the user if a product is not found
         return res
           .status(400)
           .send({ error: `Product with SKU ${sku} not found.` });
       }
 
-      // Defensive checks for data integrity
       if (!Array.isArray(product.variants)) {
         console.error(
-          `Data Integrity Error: Product with ID ${product._id} has a malformed 'variants' field (not an array).`
+          `Data Integrity Error: Product with ID ${product._id} has a malformed 'variants' field (not an array).`,
         );
         return res
           .status(500)
@@ -54,9 +51,8 @@ exports.createOrder = async (req, res) => {
       const variant = product.variants.find((v) => v.sku === sku);
 
       if (!variant) {
-        // This case is unlikely if the product was found, but it's a good safeguard
         console.error(
-          `Data Integrity Error: SKU ${sku} not found in variants of product ${product._id}, though product was matched.`
+          `Data Integrity Error: SKU ${sku} not found in variants of product ${product._id}, though product was matched.`,
         );
         return res
           .status(500)
@@ -65,7 +61,7 @@ exports.createOrder = async (req, res) => {
 
       if (typeof variant.stock_quantity !== "number") {
         console.error(
-          `Data Integrity Error: Variant with SKU ${sku} in product ${product._id} is missing 'stock_quantity' or it is not a number.`
+          `Data Integrity Error: Variant with SKU ${sku} in product ${product._id} is missing 'stock_quantity' or it is not a number.`,
         );
         return res
           .status(400)
@@ -81,7 +77,7 @@ exports.createOrder = async (req, res) => {
       // Update stock quantity
       await productCollection.updateOne(
         { "variants.sku": sku },
-        { $inc: { "variants.$.stock_quantity": -quantity } }
+        { $inc: { "variants.$.stock_quantity": -quantity } },
       );
 
       // Create inventory log
@@ -165,7 +161,7 @@ exports.updateOrder = async (req, res) => {
                 tracking_code: "",
                 shippingNote: "",
               },
-            }
+            },
           );
 
           const updatedOrder = await orderCollection.findOne({
@@ -181,7 +177,7 @@ exports.updateOrder = async (req, res) => {
         // Generic status-only update
         const updateResult = await orderCollection.updateOne(
           { _id: new ObjectId(id) },
-          { $set: { status } }
+          { $set: { status } },
         );
 
         const updatedOrder = await orderCollection.findOne({
@@ -203,19 +199,19 @@ exports.updateOrder = async (req, res) => {
     if (new_note) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $push: { admin_notes: new_note } }
+        { $push: { admin_notes: new_note } },
       );
     }
     if (approvedBy) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status, approvedBy } }
+        { $set: { status, approvedBy } },
       );
     }
     if (processBy) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status, processBy } }
+        { $set: { status, processBy } },
       );
     }
 
@@ -230,7 +226,7 @@ exports.updateOrder = async (req, res) => {
             tracking_code,
             ...(shippingNote && { shippingNote }),
           },
-        }
+        },
       );
     }
     if (deliveredBy) {
@@ -244,7 +240,7 @@ exports.updateOrder = async (req, res) => {
               ...(deliveredBy && { deliveredBy }),
               ...(cancelBy && { cancelBy }),
             },
-          }
+          },
         );
 
         // ✅ Step 2: এখন আবার সেই order টা খুঁজে বের করো
@@ -262,7 +258,7 @@ exports.updateOrder = async (req, res) => {
     if (cancelBy) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status, cancelBy } }
+        { $set: { status, cancelBy } },
       );
     }
 
@@ -327,14 +323,14 @@ exports.updateFullOrder = async (req, res) => {
     if (orderData.items) {
       orderData.subtotal = orderData.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
-        0
+        0,
       );
       orderData.total = orderData.subtotal + (orderData.shippingCost || 0);
     }
 
     const result = await orderCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: orderData }
+      { $set: orderData },
     );
 
     if (result.matchedCount === 0) {
@@ -364,7 +360,9 @@ exports.deleteOrders = async (req, res) => {
       return res.status(400).json({ error: "Invalid request body" });
     }
     const objectIds = ids.map((id) => new ObjectId(id));
-    const result = await orderCollection.deleteMany({ _id: { $in: objectIds } });
+    const result = await orderCollection.deleteMany({
+      _id: { $in: objectIds },
+    });
     res.json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error("Error deleting orders:", error);
