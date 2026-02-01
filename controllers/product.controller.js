@@ -1,33 +1,74 @@
 const { ObjectId } = require("mongodb");
+const { v4: uuidv4 } = require("uuid");
 const client = require("../config/db");
 
 const productCollection = client.db("sishuSheba").collection("products");
 
-// Refactored to handle product variants
+const convertObjectIdsToStrings = (data) => {
+  if (data === null || data === undefined) return data;
+
+  if (data instanceof ObjectId) {
+    return data.toString();
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item) => convertObjectIdsToStrings(item));
+  }
+
+  if (typeof data === "object") {
+    const converted = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value instanceof ObjectId) {
+        converted[key] = value.toString();
+      } else if (Array.isArray(value)) {
+        converted[key] = convertObjectIdsToStrings(value);
+      } else if (value !== null && typeof value === "object") {
+        converted[key] = convertObjectIdsToStrings(value);
+      } else {
+        converted[key] = value;
+      }
+    }
+    return converted;
+  }
+
+  return data;
+};
+
 exports.addProduct = async (req, res) => {
   try {
     const productData = req.body;
 
-    // Basic validation
-    if (!productData.name || !productData.variants || productData.variants.length === 0) {
-      return res.status(400).send({ error: "Product name and at least one variant are required." });
+    if (
+      !productData.name ||
+      !productData.variants ||
+      productData.variants.length === 0
+    ) {
+      return res
+        .status(400)
+        .send({ error: "Product name and at least one variant are required." });
     }
 
-    // Ensure all variants have SKUs
-    if (productData.variants.some(v => !v.sku)) {
-      return res.status(400).send({ error: "All product variants must have a unique SKU." });
+    if (productData.variants.some((v) => !v.sku)) {
+      return res
+        .status(400)
+        .send({ error: "All product variants must have a unique SKU." });
     }
 
-    // Check for SKU uniqueness across the database
-    const skus = productData.variants.map(v => v.sku);
-    const existingProduct = await productCollection.findOne({ "variants.sku": { $in: skus } });
+    const skus = productData.variants.map((v) => v.sku);
+    const existingProduct = await productCollection.findOne({
+      "variants.sku": { $in: skus },
+    });
 
     if (existingProduct) {
-      return res.status(409).send({ error: "One or more SKUs are already in use." });
+      return res
+        .status(409)
+        .send({ error: "One or more SKUs are already in use." });
     }
 
+    productData._id = new ObjectId().toString();
+
     const result = await productCollection.insertOne(productData);
-    res.status(201).send({ success: true, insertedId: result.insertedId });
+    res.status(201).send({ success: true, insertedId: productData._id });
   } catch (error) {
     console.error("Error adding product:", error);
     res.status(500).send({ error: "Internal Server Error" });
@@ -48,7 +89,11 @@ exports.getAllProducts = async (req, res) => {
       const limitNum = parseInt(limit) || 10;
       const skip = (pageNum - 1) * limitNum;
 
-      const products = await productCollection.find(query).skip(skip).limit(limitNum).toArray();
+      const products = await productCollection
+        .find(query)
+        .skip(skip)
+        .limit(limitNum)
+        .toArray();
       const total = await productCollection.countDocuments(query);
 
       return res.send({ products, total });
@@ -65,13 +110,8 @@ exports.getAllProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
   try {
     const id = req.params.id;
-    let product = null;
-    if (ObjectId.isValid(id)) {
-      product = await productCollection.findOne({ _id: new ObjectId(id) });
-    }
-    if (!product) {
-      product = await productCollection.findOne({ _id: id });
-    }
+
+    const product = await productCollection.findOne({ _id: id });
 
     if (!product) {
       return res.status(404).send({ message: "Product not found" });
@@ -83,7 +123,6 @@ exports.getProductById = async (req, res) => {
   }
 };
 
-// This function might need to be re-evaluated based on how you want to display categories with variants
 exports.getProductsByCategory = async (req, res) => {
   try {
     const category = req.params.category;
@@ -95,7 +134,6 @@ exports.getProductsByCategory = async (req, res) => {
   }
 };
 
-// This function is likely for preview and might not need changes unless you want to validate variants
 exports.addProductPreview = async (req, res) => {
   try {
     const product = req.body;
@@ -105,61 +143,58 @@ exports.addProductPreview = async (req, res) => {
   }
 };
 
-// Refactored to handle product variants
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
 
-    // Basic validation
-    if (!updateData.name || !updateData.variants || updateData.variants.length === 0) {
-      return res.status(400).send({ error: "Product name and at least one variant are required." });
+    if (
+      !updateData.name ||
+      !updateData.variants ||
+      updateData.variants.length === 0
+    ) {
+      return res
+        .status(400)
+        .send({ error: "Product name and at least one variant are required." });
     }
 
-    // Ensure all variants have SKUs
-    if (updateData.variants.some(v => !v.sku)) {
-      return res.status(400).send({ error: "All product variants must have a unique SKU." });
+    if (updateData.variants.some((v) => !v.sku)) {
+      return res
+        .status(400)
+        .send({ error: "All product variants must have a unique SKU." });
     }
 
-    // Prevent changing the _id
     if (updateData._id) {
       delete updateData._id;
     }
 
-    // Find the product first
-    let productToUpdate = null;
-    if (ObjectId.isValid(id)) {
-      productToUpdate = await productCollection.findOne({ _id: new ObjectId(id) });
-    }
-    if (!productToUpdate) {
-      productToUpdate = await productCollection.findOne({ _id: id });
-    }
+    const productToUpdate = await productCollection.findOne({ _id: id });
 
     if (!productToUpdate) {
       return res.status(404).send({ error: "Product not found" });
     }
 
-    // Check for SKU uniqueness across other products
-    const skus = updateData.variants.map(v => v.sku);
+    const skus = updateData.variants.map((v) => v.sku);
     if (skus.length > 0) {
-        const uniquenessQuery = {
-            "variants.sku": { $in: skus },
-            _id: { $ne: productToUpdate._id } // Use the _id from the found product
-        };
-        const existingProduct = await productCollection.findOne(uniquenessQuery);
+      const uniquenessQuery = {
+        "variants.sku": { $in: skus },
+        _id: { $ne: productToUpdate._id },
+      };
+      const existingProduct = await productCollection.findOne(uniquenessQuery);
 
-        if (existingProduct) {
-            return res.status(409).send({ error: "One or more SKUs are already in use by another product." });
-        }
+      if (existingProduct) {
+        return res.status(409).send({
+          error: "One or more SKUs are already in use by another product.",
+        });
+      }
     }
 
     const result = await productCollection.updateOne(
       { _id: productToUpdate._id },
-      { $set: updateData }
+      { $set: updateData },
     );
 
     if (result.matchedCount === 0) {
-      // This should not happen if we found the product before
       return res.status(404).send({ error: "Product not found during update" });
     }
 
@@ -173,17 +208,8 @@ exports.updateProduct = async (req, res) => {
 exports.getSingleProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    let product = null;
-    // Try finding by ObjectId first
-    if (ObjectId.isValid(id)) {
-      product = await productCollection.findOne({ _id: new ObjectId(id) });
-    }
 
-    // If not found, try finding by string ID
-    if (!product) {
-      product = await productCollection.findOne({ _id: id });
-    }
+    const product = await productCollection.findOne({ _id: id });
 
     if (!product) {
       return res.status(404).json({
@@ -208,8 +234,7 @@ exports.getSingleProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const query = { _id: new ObjectId(id) };
-    const result = await productCollection.deleteOne(query);
+    const result = await productCollection.deleteOne({ _id: id });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({
@@ -235,19 +260,21 @@ exports.deleteProduct = async (req, res) => {
 exports.getLowStockProducts = async (req, res) => {
   try {
     const lowStockThreshold = 10;
-    const lowStockProducts = await productCollection.aggregate([
-      { $unwind: "$variants" },
-      { $match: { "variants.stock_quantity": { $lt: lowStockThreshold } } },
-      {
-        $project: {
-          _id: 0,
-          productName: "$name",
-          variantName: "$variants.name",
-          sku: "$variants.sku",
-          stock_quantity: "$variants.stock_quantity",
+    const lowStockProducts = await productCollection
+      .aggregate([
+        { $unwind: "$variants" },
+        { $match: { "variants.stock_quantity": { $lt: lowStockThreshold } } },
+        {
+          $project: {
+            _id: 0,
+            productName: "$name",
+            variantName: "$variants.name",
+            sku: "$variants.sku",
+            stock_quantity: "$variants.stock_quantity",
+          },
         },
-      },
-    ]).toArray();
+      ])
+      .toArray();
 
     res.status(200).json(lowStockProducts);
   } catch (error) {
