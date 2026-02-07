@@ -369,3 +369,21 @@ exports.deleteOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+exports.getOrdersByMobile = async (req, res) => {
+  try {
+    const { mobile } = req.query;
+    if (!mobile) {
+      return res.status(400).json({ error: "Mobile number is required" });
+    }
+
+    // Query by user.mobile (correct field path)
+    const orders = await orderCollection
+      .find({ "user.mobile": mobile })
+      .toArray();
+    res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    console.error("Error fetching orders by mobile:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
