@@ -195,7 +195,7 @@ exports.forgotPassword = async (req, res) => {
     );
 
     const resetLink = `${
-      process.env.CLIENT_URL || "https://sstest.shongbad.online"
+      process.env.CLIENT_URL || "https://api.sishusheba.com"
     }/reset-password/${token}`;
 
     // Send the email

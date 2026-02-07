@@ -18,13 +18,10 @@ const allowedOrigins = [
   "https://www.shishuseba.com",
 ];
 
-// Optional: regex pattern matching for preview builds or all localhost ports
 function isAllowedOrigin(origin) {
   if (!origin) return true;
   return (
-    allowedOrigins.includes(origin) ||
-    /^https:\/\/[a-zA-Z0-9-]+--shishu-sheba\.netlify\.app$/.test(origin) ||
-    /^http:\/\/localhost:\d+$/.test(origin)
+    allowedOrigins.includes(origin) || /^http:\/\/localhost:\d+$/.test(origin)
   );
 }
 
