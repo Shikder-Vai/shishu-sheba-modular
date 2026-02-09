@@ -34,6 +34,20 @@ const convertObjectIdsToStrings = (data) => {
   return data;
 };
 
+// Helper function to find product by string or ObjectId
+const findProductById = async (id) => {
+  // First try with string _id
+  let product = await productCollection.findOne({ _id: id });
+  if (product) return product;
+
+  // If not found and id looks like a valid ObjectId, try with ObjectId
+  if (ObjectId.isValid(id)) {
+    product = await productCollection.findOne({ _id: new ObjectId(id) });
+  }
+
+  return product;
+};
+
 exports.addProduct = async (req, res) => {
   try {
     const productData = req.body;
@@ -111,7 +125,7 @@ exports.getProductById = async (req, res) => {
   try {
     const id = req.params.id;
 
-    const product = await productCollection.findOne({ _id: id });
+    const product = await findProductById(id);
 
     if (!product) {
       return res.status(404).send({ message: "Product not found" });
@@ -168,7 +182,7 @@ exports.updateProduct = async (req, res) => {
       delete updateData._id;
     }
 
-    const productToUpdate = await productCollection.findOne({ _id: id });
+    const productToUpdate = await findProductById(id);
 
     if (!productToUpdate) {
       return res.status(404).send({ error: "Product not found" });
@@ -209,7 +223,7 @@ exports.getSingleProduct = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const product = await productCollection.findOne({ _id: id });
+    const product = await findProductById(id);
 
     if (!product) {
       return res.status(404).json({
@@ -234,7 +248,14 @@ exports.getSingleProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await productCollection.deleteOne({ _id: id });
+
+    // First try with string _id
+    let result = await productCollection.deleteOne({ _id: id });
+
+    // If not deleted and id looks like a valid ObjectId, try with ObjectId
+    if (result.deletedCount === 0 && ObjectId.isValid(id)) {
+      result = await productCollection.deleteOne({ _id: new ObjectId(id) });
+    }
 
     if (result.deletedCount === 0) {
       return res.status(404).json({
