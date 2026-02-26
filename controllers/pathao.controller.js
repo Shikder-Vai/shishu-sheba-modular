@@ -125,3 +125,52 @@ exports.getStoresHandler = async (req, res) => {
         });
     }
 };
+
+/**
+ * GET /v1/pathao/track/:consignmentId
+ * Fetches Pathao order status info for a given consignment ID.
+ */
+exports.trackOrderHandler = async (req, res) => {
+    try {
+        const { consignmentId } = req.params;
+
+        if (!consignmentId) {
+            return res.status(400).json({ success: false, message: "consignmentId is required" });
+        }
+
+        const creds = await pathaoKeysCollection.findOne({ _id: "default" });
+
+        if (!creds || !creds.clientId) {
+            return res.status(400).json({
+                success: false,
+                message: "Pathao credentials not configured.",
+            });
+        }
+
+        const base = creds.baseUrl || "https://api-hermes.pathao.com";
+        const token = await getValidToken(creds);
+
+        const response = await axios.get(
+            `${base}/aladdin/api/v1/orders/${consignmentId}/info`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                timeout: 15000,
+            }
+        );
+
+        res.status(200).json({
+            success: true,
+            data: response.data?.data || {},
+        });
+    } catch (err) {
+        console.error("Pathao track error:", err.response?.data || err.message);
+        res.status(500).json({
+            success: false,
+            message: err.response?.data?.message || "Failed to fetch Pathao tracking info",
+            error_details: err.response?.data,
+        });
+    }
+};
