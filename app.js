@@ -69,6 +69,8 @@ app.use("/v1/pixel-codes", require("./routes/pixelCode.routes"));
 app.use("/v1/steadfast-api-keys", require("./routes/steadfastApiKeys.routes"));
 app.use("/v1/pathao", require("./routes/pathao.routes"));
 app.use("/v1/pathao-api-keys", require("./routes/pathaoApiKeys.routes"));
+app.use("/v1/carrybee", require("./routes/carrybee.routes"));
+app.use("/v1/carrybee-api-keys", require("./routes/carrybeeApiKeys.routes"));
 
 // === Health Check ===
 app.get("/health", (req, res) => {
