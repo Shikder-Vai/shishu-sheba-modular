@@ -8,18 +8,30 @@ const {
   getUserRole,
   forgotPassword,
   resetPassword,
+  getUserProfile,
+  updateUserProfile,
+  changePassword,
+  registerCustomer,
+  loginCustomer,
 } = require("../controllers/auth.controller");
 const {
   isAdmin,
   isAdminOrModerator,
+  isAuthenticated,
 } = require("../middleware/auth.middleware");
 const router = express.Router();
 
-// Register route
+// Admin Register route (Original)
 router.post("/register", registerUser);
 
-// Login route
+// Admin Login route (Original)
 router.post("/login", loginUser);
+
+// Customer Register route (New)
+router.post("/users/register", registerCustomer);
+
+// Customer Login route (New)
+router.post("/users/login", loginCustomer);
 
 // Forgot & Reset Password
 router.post("/forgot-password", forgotPassword);
@@ -35,5 +47,10 @@ router.put("/users/role/:id", isAdmin, updateUserRole);
 
 // Get user role
 router.get("/users/role/:id", isAdminOrModerator, getUserRole);
+
+// Profile
+router.get("/users/me", isAuthenticated, getUserProfile);
+router.put("/users/profile", isAuthenticated, updateUserProfile);
+router.put("/users/change-password", isAuthenticated, changePassword);
 
 module.exports = router;

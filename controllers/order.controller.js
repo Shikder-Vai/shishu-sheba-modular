@@ -387,3 +387,50 @@ exports.getOrdersByMobile = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+exports.getMyOrders = async (req, res) => {
+  try {
+    const userId = req.headers["user-id"];
+    console.log("HIT getMyOrders! userId from header:", userId);
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const clientDB = require("../config/db");
+    const adminCollection = clientDB.db("sishuSheba").collection("admin");
+    const customersCollection = clientDB.db("sishuSheba").collection("customers");
+
+    let user = await customersCollection.findOne({ _id: new ObjectId(userId) });
+    console.log("checked customers: user found?", !!user);
+    if (!user) {
+      user = await adminCollection.findOne({ _id: new ObjectId(userId) });
+      console.log("checked admin: user found?", !!user);
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { email, phone, mobile } = user;
+
+    const query = {
+      $or: [
+        { userId: userId },
+      ]
+    };
+
+    const searchEmail = email || user.email;
+    const searchPhone = phone || mobile || user.mobile;
+
+    if (searchEmail) query.$or.push({ "user.email": searchEmail });
+    if (searchPhone) query.$or.push({ "user.mobile": searchPhone });
+
+    const orders = await orderCollection.find(query).sort({ _id: -1 }).toArray();
+
+    res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    console.error("Error fetching my orders:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};

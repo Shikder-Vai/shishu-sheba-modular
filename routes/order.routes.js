@@ -8,8 +8,9 @@ const {
   updateFullOrder,
   deleteOrders,
   getOrdersByMobile,
+  getMyOrders,
 } = require("../controllers/order.controller");
-const { isAdminOrModerator } = require("../middleware/auth.middleware");
+const { isAdminOrModerator, isAuthenticated } = require("../middleware/auth.middleware");
 
 router.post("/order", createOrder);
 router.post("/admin-order", isAdminOrModerator, createOrder);
@@ -19,5 +20,7 @@ router.get("/order/track/:orderId", trackOrder);
 router.patch("/order-request/:id", updateOrder);
 router.patch("/update-full-order/:id", updateFullOrder);
 router.delete("/order", deleteOrders);
+
+router.get("/my-orders", isAuthenticated, getMyOrders);
 
 module.exports = router;

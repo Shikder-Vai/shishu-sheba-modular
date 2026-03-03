@@ -1,6 +1,7 @@
 const { ObjectId } = require("mongodb");
 const client = require("../config/db");
 const usersCollection = client.db("sishuSheba").collection("admin");
+const customersCollection = client.db("sishuSheba").collection("customers");
 const bcrypt = require("bcryptjs");
 const { sendEmail } = require("../services/email.service");
 const crypto = require("crypto");
@@ -74,6 +75,82 @@ exports.loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Customer Register Controller ===
+exports.registerCustomer = async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Name, email, and password are required" });
+    }
+
+    const existingUser = await customersCollection.findOne({ email });
+
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = {
+      name,
+      email,
+      password: hashedPassword,
+      role: "user",
+      createdAt: new Date(),
+    };
+
+    const inserted = await customersCollection.insertOne(newUser);
+    res.status(201).json({
+      message: "Registration successful",
+      user: {
+        _id: inserted.insertedId,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role
+      }
+    });
+  } catch (error) {
+    console.error("Register Customer error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Customer Login Controller ===
+exports.loginCustomer = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
+    const user = await customersCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Login customer error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -256,3 +333,118 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+// === Get User Profile ===
+exports.getUserProfile = async (req, res) => {
+  try {
+    const userId = req.headers["user-id"];
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    let user = await customersCollection.findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      // Fallback to admin collection
+      user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Exclude password and sensitive Info
+    const { password, passwordResetToken, passwordResetExpires, ...userProfile } = user;
+    res.status(200).json(userProfile);
+  } catch (error) {
+    console.error("Get profile error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Update User Profile ===
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.headers["user-id"];
+    const { name, phone } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    let collectionToUpdate = customersCollection;
+    let existingUser = await customersCollection.findOne({ _id: new ObjectId(userId) });
+
+    if (!existingUser) {
+      existingUser = await usersCollection.findOne({ _id: new ObjectId(userId) });
+      if (existingUser) {
+        collectionToUpdate = usersCollection;
+      }
+    }
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await collectionToUpdate.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { name, phone } }
+    );
+
+    const updatedUser = await collectionToUpdate.findOne({ _id: new ObjectId(userId) });
+    const { password, ...userProfile } = updatedUser;
+
+    res.status(200).json({ message: "Profile updated successfully", user: userProfile });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// === Change Password ===
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.headers["user-id"];
+    const { currentPassword, newPassword } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new passions are required" });
+    }
+
+    let collectionToUpdate = customersCollection;
+    let user = await customersCollection.findOne({ _id: new ObjectId(userId) });
+
+    if (!user) {
+      user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+      if (user) {
+        collectionToUpdate = usersCollection;
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Incorporated current password" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await collectionToUpdate.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { password: hashedPassword } }
+    );
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Change password error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+

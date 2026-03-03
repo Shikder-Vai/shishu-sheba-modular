@@ -30,3 +30,10 @@ const checkRole = (roles) => async (req, res, next) => {
 exports.isAdmin = checkRole(["admin"]);
 exports.isModerator = checkRole(["moderator"]);
 exports.isAdminOrModerator = checkRole(["admin", "moderator"]);
+exports.isAuthenticated = async (req, res, next) => {
+  const userId = req.headers["user-id"];
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized: User ID not provided" });
+  }
+  next();
+};
