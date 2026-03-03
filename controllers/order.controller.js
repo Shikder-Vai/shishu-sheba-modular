@@ -391,7 +391,6 @@ exports.getOrdersByMobile = async (req, res) => {
 exports.getMyOrders = async (req, res) => {
   try {
     const userId = req.headers["user-id"];
-    console.log("HIT getMyOrders! userId from header:", userId);
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -402,10 +401,8 @@ exports.getMyOrders = async (req, res) => {
     const customersCollection = clientDB.db("sishuSheba").collection("customers");
 
     let user = await customersCollection.findOne({ _id: new ObjectId(userId) });
-    console.log("checked customers: user found?", !!user);
     if (!user) {
       user = await adminCollection.findOne({ _id: new ObjectId(userId) });
-      console.log("checked admin: user found?", !!user);
     }
 
     if (!user) {
