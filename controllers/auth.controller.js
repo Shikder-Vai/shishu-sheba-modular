@@ -81,7 +81,7 @@ exports.loginUser = async (req, res) => {
 
 // === Customer Register Controller ===
 exports.registerCustomer = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, mobile, password } = req.body;
   try {
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email, and password are required" });
@@ -98,6 +98,7 @@ exports.registerCustomer = async (req, res) => {
     const newUser = {
       name,
       email,
+      ...(mobile && { mobile: mobile.trim() }),
       password: hashedPassword,
       role: "user",
       createdAt: new Date(),
@@ -121,23 +122,25 @@ exports.registerCustomer = async (req, res) => {
 
 // === Customer Login Controller ===
 exports.loginCustomer = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, mobile, password } = req.body;
 
   try {
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
+    if ((!email && !mobile) || !password) {
+      return res.status(400).json({ message: "Email or mobile, and password are required" });
     }
 
-    const user = await customersCollection.findOne({ email });
+    // Find by email or mobile
+    const query = email ? { email } : { mobile };
+    const user = await customersCollection.findOne(query);
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     res.status(200).json({
@@ -146,6 +149,7 @@ exports.loginCustomer = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        mobile: user.mobile || null,
         role: user.role,
       },
     });
@@ -365,7 +369,7 @@ exports.getUserProfile = async (req, res) => {
 exports.updateUserProfile = async (req, res) => {
   try {
     const userId = req.headers["user-id"];
-    const { name, phone } = req.body;
+    const { name, mobile } = req.body;
 
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -387,7 +391,7 @@ exports.updateUserProfile = async (req, res) => {
 
     await collectionToUpdate.updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { name, phone } }
+      { $set: { name, mobile } }
     );
 
     const updatedUser = await collectionToUpdate.findOne({ _id: new ObjectId(userId) });
