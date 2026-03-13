@@ -13,6 +13,8 @@ const {
   changePassword,
   registerCustomer,
   loginCustomer,
+  getAllCustomers,
+  updateCustomerStatus,
 } = require("../controllers/auth.controller");
 const {
   isAdmin,
@@ -38,9 +40,13 @@ router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
 router.get("/admin", isAdminOrModerator, getAllAdmin);
+router.get("/users", isAdminOrModerator, getAllCustomers);
 
 // Delete user by ID (only if role is admin)
-router.delete("/users/:id", isAdmin, deleteUser); // ✅ add this line
+router.delete("/users/:id", isAdmin, deleteUser);
+
+// Ban/Unban customer (admin only)
+router.patch("/users/:id/status", isAdmin, updateCustomerStatus);
 
 // Update user role
 router.put("/users/role/:id", isAdmin, updateUserRole);

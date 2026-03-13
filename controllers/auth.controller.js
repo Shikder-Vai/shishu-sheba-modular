@@ -143,6 +143,11 @@ exports.loginCustomer = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // Check if banned
+    if (user.status === "banned") {
+      return res.status(403).json({ message: "Your account has been banned. Please contact support." });
+    }
+
     res.status(200).json({
       message: "Login successful",
       user: {
@@ -151,6 +156,7 @@ exports.loginCustomer = async (req, res) => {
         email: user.email,
         mobile: user.mobile || null,
         role: user.role,
+        status: user.status || "active",
       },
     });
   } catch (error) {
@@ -199,6 +205,51 @@ exports.getAllAdmin = async (req, res) => {
   } catch (error) {
     console.error("Get Admin Error:", error);
     res.status(500).json({ message: "Failed to fetch admin" });
+  }
+};
+
+// === Get All Customers ===
+exports.getAllCustomers = async (req, res) => {
+  try {
+    const customers = await customersCollection
+      .find()
+      .project({ password: 0 })
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.status(200).json(customers);
+  } catch (error) {
+    console.error("Get Customers Error:", error);
+    res.status(500).json({ message: "Failed to fetch customers" });
+  }
+};
+
+// === Ban / Unban Customer ===
+exports.updateCustomerStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // "active" | "banned"
+
+  try {
+    if (!id || !status) {
+      return res.status(400).json({ message: "Customer ID and status required" });
+    }
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid customer ID" });
+    }
+
+    const result = await customersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status, updatedAt: new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const action = status === "banned" ? "banned" : "unbanned";
+    res.status(200).json({ message: `Customer ${action} successfully` });
+  } catch (error) {
+    console.error("Update customer status error:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 

@@ -3,6 +3,7 @@ const client = require("../config/db");
 
 const orderCollection = client.db("sishuSheba").collection("orders");
 const productCollection = client.db("sishuSheba").collection("products");
+const customersCollection = client.db("sishuSheba").collection("customers");
 const inventoryLogCollection = client
   .db("sishuSheba")
   .collection("inventory_logs");
@@ -11,6 +12,19 @@ exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
     console.log("Received order data:", JSON.stringify(orderData, null, 2));
+
+    // --- Check if customer is banned (by email or mobile) ---
+    const customerEmail = orderData.user?.email || orderData.email;
+    const customerMobile = orderData.user?.mobile || orderData.mobile || orderData.user?.phone;
+    if (customerEmail || customerMobile) {
+      const banQuery = [];
+      if (customerEmail) banQuery.push({ email: customerEmail });
+      if (customerMobile) banQuery.push({ mobile: customerMobile });
+      const customer = await customersCollection.findOne({ $or: banQuery });
+      if (customer?.status === "banned") {
+        return res.status(403).json({ error: "Your account has been banned. Please contact support." });
+      }
+    }
 
     // Sanitize item names
     if (orderData.items && Array.isArray(orderData.items)) {
