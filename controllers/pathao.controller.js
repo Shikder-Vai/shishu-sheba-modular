@@ -100,9 +100,12 @@ exports.getStoresHandler = async (req, res) => {
             });
         }
 
+        const PER_PAGE = 10;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
         const base = creds.baseUrl || "https://api-hermes.pathao.com";
         const token = await getValidToken(creds);
 
+        // Fetch all stores from Pathao in one call (Pathao ignores per_page param)
         const response = await axios.get(`${base}/aladdin/api/v1/stores`, {
             headers: {
                 "Content-Type": "application/json",
@@ -111,10 +114,22 @@ exports.getStoresHandler = async (req, res) => {
             timeout: 15000,
         });
 
+        const allStores = response.data?.data?.data || [];
+        const total = allStores.length;
+        const lastPage = Math.max(1, Math.ceil(total / PER_PAGE));
+        const safePage = Math.min(page, lastPage);
+
+        // Slice the stores for the requested page
+        const start = (safePage - 1) * PER_PAGE;
+        const stores = allStores.slice(start, start + PER_PAGE);
+
         res.status(200).json({
             success: true,
-            stores: response.data?.data?.data || [],
-            total: response.data?.data?.total || 0,
+            stores,
+            total,
+            currentPage: safePage,
+            lastPage,
+            perPage: PER_PAGE,
         });
     } catch (err) {
         console.error("Pathao get stores error:", err.response?.data || err.message);
@@ -125,6 +140,7 @@ exports.getStoresHandler = async (req, res) => {
         });
     }
 };
+
 
 /**
  * GET /v1/pathao/track/:consignmentId

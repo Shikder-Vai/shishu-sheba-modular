@@ -13,6 +13,9 @@ exports.getPathaoApiKeys = async (req, res) => {
                 password: doc.password || "",
                 storeId: doc.storeId || "",
                 baseUrl: doc.baseUrl || "https://api-hermes.pathao.com",
+                accessToken: doc.accessToken || "",
+                refreshToken: doc.refreshToken || "",
+                tokenExpiresAt: doc.tokenExpiresAt || null,
             }
             : {
                 clientId: "",
@@ -21,6 +24,9 @@ exports.getPathaoApiKeys = async (req, res) => {
                 password: "",
                 storeId: "",
                 baseUrl: "https://api-hermes.pathao.com",
+                accessToken: "",
+                refreshToken: "",
+                tokenExpiresAt: null,
             };
 
         res.status(200).json({ success: true, data });
@@ -37,7 +43,7 @@ exports.getPathaoApiKeys = async (req, res) => {
 // PUT /v1/pathao-api-keys
 exports.updatePathaoApiKeys = async (req, res) => {
     try {
-        const { clientId, clientSecret, username, password, storeId, baseUrl } =
+        const { clientId, clientSecret, username, password, storeId, baseUrl, accessToken, refreshToken, tokenExpiresAt } =
             req.body;
 
         const updateData = {};
@@ -49,10 +55,23 @@ exports.updatePathaoApiKeys = async (req, res) => {
         if (baseUrl !== undefined) updateData.baseUrl = baseUrl;
         updateData.updatedAt = new Date();
 
-        // Clear stored tokens when credentials change so a fresh token is issued
-        updateData.accessToken = "";
-        updateData.refreshToken = "";
-        updateData.tokenExpiresAt = null;
+        // If token fields are explicitly provided, store them;
+        // otherwise clear tokens so a fresh one is fetched on next use
+        if (accessToken !== undefined) {
+            updateData.accessToken = accessToken;
+        } else {
+            updateData.accessToken = "";
+        }
+        if (refreshToken !== undefined) {
+            updateData.refreshToken = refreshToken;
+        } else {
+            updateData.refreshToken = "";
+        }
+        if (tokenExpiresAt !== undefined) {
+            updateData.tokenExpiresAt = tokenExpiresAt;
+        } else {
+            updateData.tokenExpiresAt = null;
+        }
 
         const result = await pathaoKeysCollection.updateOne(
             { _id: "default" },
@@ -68,9 +87,9 @@ exports.updatePathaoApiKeys = async (req, res) => {
                 password: password || "",
                 storeId: storeId || "",
                 baseUrl: baseUrl || "https://api-hermes.pathao.com",
-                accessToken: "",
-                refreshToken: "",
-                tokenExpiresAt: null,
+                accessToken: accessToken || "",
+                refreshToken: refreshToken || "",
+                tokenExpiresAt: tokenExpiresAt || null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             });
@@ -88,6 +107,9 @@ exports.updatePathaoApiKeys = async (req, res) => {
                 password: updatedDoc.password || "",
                 storeId: updatedDoc.storeId || "",
                 baseUrl: updatedDoc.baseUrl || "https://api-hermes.pathao.com",
+                accessToken: updatedDoc.accessToken || "",
+                refreshToken: updatedDoc.refreshToken || "",
+                tokenExpiresAt: updatedDoc.tokenExpiresAt || null,
             },
         });
     } catch (error) {
