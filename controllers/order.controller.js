@@ -445,3 +445,53 @@ exports.getMyOrders = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// GET /v1/top-selling-products
+exports.getTopSellingProducts = async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(20, parseInt(req.query.limit) || 8));
+
+    const pipeline = [
+      // Only count delivered orders
+      { $match: { status: "delivered" } },
+      // Explode items array
+      { $unwind: "$items" },
+      // Filter out items without a product _id
+      { $match: { "items._id": { $exists: true, $ne: null } } },
+      // Group by items._id (the product's _id stored in cart items) and sum quantities
+      {
+        $group: {
+          _id: "$items._id",
+          totalSold: { $sum: { $ifNull: ["$items.quantity", 1] } },
+        },
+      },
+      // Sort by most sold first
+      { $sort: { totalSold: -1 } },
+      { $limit: limit },
+      // Join full product data directly (both _ids are strings)
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product",
+        },
+      },
+      { $unwind: "$product" },
+      // Merge product fields with totalSold
+      {
+        $replaceRoot: {
+          newRoot: { $mergeObjects: ["$product", { totalSold: "$totalSold" }] },
+        },
+      },
+    ];
+
+    const results = await orderCollection.aggregate(pipeline).toArray();
+
+    res.status(200).json({ success: true, data: results });
+  } catch (error) {
+    console.error("Error fetching top selling products:", error);
+    res.status(500).json({ error: "Internal Server Error", message: error.message });
+  }
+};
+

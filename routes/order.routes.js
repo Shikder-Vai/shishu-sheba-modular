@@ -9,6 +9,7 @@ const {
   deleteOrders,
   getOrdersByMobile,
   getMyOrders,
+  getTopSellingProducts,
 } = require("../controllers/order.controller");
 const { isAdminOrModerator, isAuthenticated } = require("../middleware/auth.middleware");
 
@@ -22,5 +23,6 @@ router.patch("/update-full-order/:id", updateFullOrder);
 router.delete("/order", deleteOrders);
 
 router.get("/my-orders", isAuthenticated, getMyOrders);
+router.get("/top-selling-products", getTopSellingProducts);
 
 module.exports = router;
