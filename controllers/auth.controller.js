@@ -455,7 +455,7 @@ exports.updateUserProfile = async (req, res) => {
   }
 };
 
-// === Change Password ===
+// === Change Password (Customer) ===
 exports.changePassword = async (req, res) => {
   try {
     const userId = req.headers["user-id"];
