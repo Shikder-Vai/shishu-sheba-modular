@@ -1,14 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const pathaoApiKeysController = require("../controllers/pathaoApiKeys.controller");
+const { isAdmin } = require("../middleware/auth.middleware");
 
-// GET /v1/pathao-api-keys
 router.get("/", pathaoApiKeysController.getPathaoApiKeys);
-
-// PUT /v1/pathao-api-keys
-router.put("/", pathaoApiKeysController.updatePathaoApiKeys);
-
-// DELETE /v1/pathao-api-keys
-router.delete("/", pathaoApiKeysController.deletePathaoApiKeys);
+router.put("/", isAdmin, pathaoApiKeysController.updatePathaoApiKeys);
+router.delete("/", isAdmin, pathaoApiKeysController.deletePathaoApiKeys);
 
 module.exports = router;
