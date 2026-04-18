@@ -326,7 +326,7 @@ exports.forgotPassword = async (req, res) => {
       { $set: { passwordResetToken: token, passwordResetExpires: expires } },
     );
     //forgot password link
-    const resetLink = `${process.env.CLIENT_URL || "https://api.shishuseba.com"
+    const resetLink = `${process.env.CLIENT_URL || "https://shishuseba.com"
       }/reset-password/${token}`;
 
     // Send the email

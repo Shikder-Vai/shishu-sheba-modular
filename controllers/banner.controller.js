@@ -40,7 +40,7 @@ exports.getBanners = async (req, res) => {
 exports.updateBanner = async (req, res) => {
   try {
     const { id } = req.params;
-    const { image } = req.body;
+    const { image, link } = req.body;
 
     if (!ObjectId.isValid(id)) {
       return res.status(400).send({ error: "Invalid banner ID" });
@@ -50,9 +50,13 @@ exports.updateBanner = async (req, res) => {
       return res.status(400).send({ error: "Valid image URL is required" });
     }
 
+    const updateFields = { image };
+    // Allow link to be set or cleared (empty string clears it)
+    if (link !== undefined) updateFields.link = link;
+
     const result = await bannersCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { image } }
+      { $set: updateFields }
     );
 
     if (result.matchedCount === 0) {
@@ -70,9 +74,10 @@ exports.updateBanner = async (req, res) => {
   }
 };
 
+
 exports.addBanner = async (req, res) => {
   try {
-    const { image } = req.body;
+    const { image, link } = req.body;
 
     if (!image || typeof image !== "string") {
       return res.status(400).send({ error: "Valid image URL is required" });
@@ -80,7 +85,8 @@ exports.addBanner = async (req, res) => {
 
     const newBanner = {
       image,
-      position: 0, // You might want to calculate the position dynamically
+      link: link || "",
+      position: 0,
     };
 
     const result = await bannersCollection.insertOne(newBanner);
@@ -91,6 +97,7 @@ exports.addBanner = async (req, res) => {
     res.status(500).send({ error: "Internal server error" });
   }
 };
+
 
 exports.deleteBanner = async (req, res) => {
   try {
@@ -112,3 +119,28 @@ exports.deleteBanner = async (req, res) => {
     res.status(500).send({ error: "Internal server error" });
   }
 };
+
+exports.updateBannerLink = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { link } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ error: "Invalid banner ID" });
+    }
+
+    const result = await bannersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { link: link || "" } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).send({ error: "Banner not found" });
+    }
+
+    res.send({ success: true, message: "Banner link updated successfully" });
+  } catch (error) {
+    console.error("Error updating banner link:", error);
+    res.status(500).send({ error: "Internal server error" });
+  }
+};
