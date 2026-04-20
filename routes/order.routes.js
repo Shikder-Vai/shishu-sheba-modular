@@ -12,9 +12,11 @@ const {
   getTopSellingProducts,
 } = require("../controllers/order.controller");
 const { isAdminOrModerator, isAuthenticated } = require("../middleware/auth.middleware");
+const { orderRateLimiter } = require("../middleware/orderRateLimiter");
 
-router.post("/order", createOrder);
+router.post("/order", orderRateLimiter, createOrder);
 router.post("/admin-order", isAdminOrModerator, createOrder);
+
 router.get("/order-request", getOrdersByStatus);
 router.get("/orders-by-mobile", getOrdersByMobile);
 router.get("/order/track/:orderId", trackOrder);

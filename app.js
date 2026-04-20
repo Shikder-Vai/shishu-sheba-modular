@@ -71,7 +71,15 @@ app.use("/v1/pathao", require("./routes/pathao.routes"));
 app.use("/v1/pathao-api-keys", require("./routes/pathaoApiKeys.routes"));
 app.use("/v1/carrybee", require("./routes/carrybee.routes"));
 app.use("/v1/carrybee-api-keys", require("./routes/carrybeeApiKeys.routes"));
-app.use("/v1/general-settings", require("./routes/generalSettings.routes"));
+app.use("/v1/general-settings",    require("./routes/generalSettings.routes"));
+app.use("/v1/server-tracking",     require("./routes/serverTracking.routes"));
+
+
+// === Init Tracking Service ===
+const tracking = require("./services/tracking");
+tracking.ensureIndexes().catch(console.error);
+tracking.startRetryWorker();
+
 
 // === Health Check ===
 app.get("/health", (req, res) => {

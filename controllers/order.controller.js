@@ -13,7 +13,6 @@ exports.createOrder = async (req, res) => {
     const orderData = req.body;
     console.log("Received order data:", JSON.stringify(orderData, null, 2));
 
-    // --- Check if customer is banned (by email or mobile) ---
     const customerEmail = orderData.user?.email || orderData.email;
     const customerMobile = orderData.user?.mobile || orderData.mobile || orderData.user?.phone;
     if (customerEmail || customerMobile) {
@@ -35,14 +34,12 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Basic validation
     if (!orderData.items || orderData.items.length === 0) {
       return res
         .status(400)
         .send({ error: "Order must contain at least one item." });
     }
 
-    // Process each item in the order
     for (const item of orderData.items) {
       const { sku, quantity } = item;
 
@@ -100,16 +97,33 @@ exports.createOrder = async (req, res) => {
         change_quantity: -quantity,
         new_quantity: variant.stock_quantity - quantity,
         reason: "sale",
-        orderId: orderData.orderId, // Assuming orderId is present in the order data
+        orderId: orderData.orderId,
         timestamp: new Date(),
       };
       await inventoryLogCollection.insertOne(logEntry);
     }
 
-    // Insert the order
+    orderData.clientIp = req.clientIp || req.ip || null;
+    orderData.createdAt = new Date();
+
     const result = await orderCollection.insertOne(orderData);
 
+    // ── Server-Side Tracking (fire-and-forget) ───────────────────────────────
+    const tracking = require("../services/tracking");
+    tracking.fireEvent(
+      "purchase",
+      { order: { ...orderData, orderId: orderData.orderId }, user: orderData.user },
+      {
+        ip: req.clientIp || req.ip || req.headers["x-forwarded-for"],
+        userAgent: req.headers["user-agent"],
+        cookies: req.cookies || {},
+        clientId: req.cookies?.["_ga"] || null,
+      }
+    ).catch((err) => console.error("[Tracking] purchase event failed:", err.message));
+    // ────────────────────────────────────────────────────────────────────────
+
     res.status(201).send({ success: true, insertedId: result.insertedId });
+
   } catch (error) {
     console.error("Error creating order:", error);
     res.status(500).send({
@@ -147,7 +161,6 @@ exports.updateOrder = async (req, res) => {
       new_note,
     } = req.body;
 
-    // Handle plain status-only updates (no other fields provided)
     if (
       status &&
       !approvedBy &&
@@ -160,7 +173,6 @@ exports.updateOrder = async (req, res) => {
     ) {
       try {
         if (status === "pending") {
-          // Move back to pending: set status and remove metadata fields
           const updateResult = await orderCollection.updateOne(
             { _id: new ObjectId(id) },
             {
@@ -188,7 +200,6 @@ exports.updateOrder = async (req, res) => {
           });
         }
 
-        // Generic status-only update
         const updateResult = await orderCollection.updateOne(
           { _id: new ObjectId(id) },
           { $set: { status } },
@@ -245,7 +256,6 @@ exports.updateOrder = async (req, res) => {
     }
     if (deliveredBy) {
       try {
-        // Step 1: update the order
         await orderCollection.updateOne(
           { _id: new ObjectId(id) },
           {
@@ -257,12 +267,9 @@ exports.updateOrder = async (req, res) => {
           },
         );
 
-        // ✅ Step 2: এখন আবার সেই order টা খুঁজে বের করো
         const updatedOrder = await orderCollection.findOne({
           _id: new ObjectId(id),
         });
-
-        // ✅ Step 3: এটাকে response হিসেবে পাঠাও
         res.send(updatedOrder);
       } catch (err) {
         console.error(err);
@@ -292,7 +299,6 @@ exports.trackOrder = async (req, res) => {
     const { orderId } = req.params;
     console.log("Searching for order ID:", orderId);
 
-    // Correct way to find by orderId field
     const order = await orderCollection.findOne({ orderId: orderId });
 
     if (!order) {
@@ -318,22 +324,19 @@ exports.trackOrder = async (req, res) => {
   }
 };
 
-// Update full order details (for edit modal)
 exports.updateFullOrder = async (req, res) => {
   try {
     const { id } = req.params;
     const orderData = req.body;
 
-    // Remove _id from items and the main order if present
     delete orderData._id;
     if (orderData.items) {
       orderData.items = orderData.items.map((item) => {
-        delete item._id; // Remove _id from each item
+        delete item._id;
         return item;
       });
     }
 
-    // Calculate new totals if items were modified
     if (orderData.items) {
       orderData.subtotal = orderData.items.reduce(
         (sum, item) => sum + item.price * item.quantity,
@@ -480,7 +483,6 @@ exports.getTopSellingProducts = async (req, res) => {
         },
       },
       { $unwind: "$product" },
-      // Merge product fields with totalSold
       {
         $replaceRoot: {
           newRoot: { $mergeObjects: ["$product", { totalSold: "$totalSold" }] },
