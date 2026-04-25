@@ -260,9 +260,10 @@ exports.updateOrder = async (req, res) => {
           { _id: new ObjectId(id) },
           {
             $set: {
-              ...(status && { status }),
+              ...(status     && { status }),
               ...(deliveredBy && { deliveredBy }),
-              ...(cancelBy && { cancelBy }),
+              ...(cancelBy   && { cancelBy }),
+              deliveredAt: new Date(),
             },
           },
         );

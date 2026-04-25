@@ -1,6 +1,129 @@
-// controllers/orderReportsController.js
 const { ObjectId } = require("mongodb");
 const client = require("../config/db");
+
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const { startDate, endDate, district } = req.query;
+    const Order = client.db("sishuSheba").collection("orders");
+
+    const start = startDate ? new Date(startDate) : null;
+    const end   = endDate   ? new Date(endDate)   : null;
+
+    const deliveredMatch = { status: "delivered" };
+    const allOrdersMatch = {};
+
+    if (start && end) {
+      deliveredMatch.$expr = {
+        $and: [
+          { $gte: [{ $dateFromString: { dateString: "$deliveredBy.deliveredTime", onError: new Date(0) } }, start] },
+          { $lte: [{ $dateFromString: { dateString: "$deliveredBy.deliveredTime", onError: new Date(0) } }, end] },
+        ],
+      };
+      allOrdersMatch.createdAt = { $gte: start, $lte: end };
+    }
+
+    if (district && district !== "all") {
+      deliveredMatch["user.district"]  = district;
+      allOrdersMatch["user.district"]  = district;
+    }
+    const [
+      deliveredStats,
+      totalOrdersResult,
+      orderStatusSummary,
+      productPerformance,
+      districtWiseOrders,
+      customerInsights,
+    ] = await Promise.all([
+      Order.aggregate([
+        { $match: deliveredMatch },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: "$total" },
+            deliveredCount: { $sum: 1 },
+          },
+        },
+        { $project: { _id: 0, totalRevenue: 1, deliveredCount: 1 } },
+      ]).toArray(),
+
+      Order.aggregate([
+        { $match: allOrdersMatch },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            totalOrdersValue: { $sum: "$total" },
+            averageOrderValue: { $avg: "$total" },
+          },
+        },
+        { $project: { _id: 0, totalOrders: 1, totalOrdersValue: 1, averageOrderValue: { $round: ["$averageOrderValue", 2] } } },
+      ]).toArray(),
+
+      Order.aggregate([
+        { $match: allOrdersMatch },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+        { $project: { status: "$_id", count: 1, _id: 0 } },
+      ]).toArray(),
+
+      Order.aggregate([
+        { $match: deliveredMatch },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: { name: "$items.name", weight: "$items.weight", sku: "$items.sku" },
+            totalQuantity: { $sum: "$items.quantity" },
+            totalRevenue: { $sum: { $multiply: ["$items.quantity", { $toDouble: "$items.price" }] } },
+          },
+        },
+        { $project: { _id: 0, productName: "$_id.name", weight: "$_id.weight", sku: "$_id.sku", totalQuantity: 1, totalRevenue: 1 } },
+        { $sort: { totalQuantity: -1 } },
+        { $limit: 10 },
+      ]).toArray(),
+
+      Order.aggregate([
+        { $match: allOrdersMatch },
+        { $group: { _id: "$user.district", orderCount: { $sum: 1 }, totalRevenue: { $sum: "$total" } } },
+        { $project: { _id: 0, district: "$_id", orderCount: 1, totalRevenue: 1 } },
+        { $sort: { orderCount: -1 } },
+      ]).toArray(),
+
+      Order.aggregate([
+        { $match: allOrdersMatch },
+        {
+          $group: {
+            _id: { name: "$user.name", mobile: "$user.mobile" },
+            orderCount: { $sum: 1 },
+            totalSpent: { $sum: "$total" },
+          },
+        },
+        { $project: { _id: 0, customerName: "$_id.name", mobile: "$_id.mobile", orderCount: 1, totalSpent: 1 } },
+        { $sort: { totalSpent: -1 } },
+        { $limit: 10 },
+      ]).toArray(),
+    ]);
+
+    const delivered = deliveredStats[0] || { totalRevenue: 0, deliveredCount: 0 };
+    const allOrders = totalOrdersResult[0] || { totalOrders: 0, totalOrdersValue: 0, averageOrderValue: 0 };
+
+    res.json({
+      salesPerformance: {
+        totalRevenue: delivered.totalRevenue,
+        averageOrderValue: allOrders.averageOrderValue,
+        deliveredCount: delivered.deliveredCount,
+        totalOrders: allOrders.totalOrders,
+        totalOrdersValue: allOrders.totalOrdersValue,
+      },
+      orderStatusSummary,
+      productPerformance,
+      districtWiseOrders,
+      customerInsights,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
 
 exports.getSalesPerformance = async (req, res) => {
   try {
@@ -12,7 +135,7 @@ exports.getSalesPerformance = async (req, res) => {
     };
 
     if (startDate && endDate) {
-      matchConditions.orderDate = {
+      matchConditions.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
@@ -94,7 +217,7 @@ exports.getProductPerformance = async (req, res) => {
     const matchConditions = {};
 
     if (startDate && endDate) {
-      matchConditions.orderDate = {
+      matchConditions.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
@@ -151,7 +274,7 @@ exports.getDistrictWiseOrders = async (req, res) => {
     const matchConditions = {};
 
     if (startDate && endDate) {
-      matchConditions.orderDate = {
+      matchConditions.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
@@ -192,7 +315,7 @@ exports.getCustomerInsights = async (req, res) => {
     const matchConditions = {};
 
     if (startDate && endDate) {
-      matchConditions.orderDate = {
+      matchConditions.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };

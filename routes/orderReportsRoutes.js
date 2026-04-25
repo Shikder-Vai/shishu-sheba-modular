@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const orderReportsController = require("../controllers/orderReportsController");
 
+router.get("/dashboard", orderReportsController.getDashboardStats);
 router.get("/sales-performance", orderReportsController.getSalesPerformance);
 router.get(
   "/order-status-summary",
