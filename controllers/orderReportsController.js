@@ -109,7 +109,6 @@ exports.getDashboardStats = async (req, res) => {
         },
         { $project: { _id: 0, customerName: "$_id.name", mobile: "$_id.mobile", orderCount: 1, totalSpent: 1 } },
         { $sort: { totalSpent: -1 } },
-        { $limit: 10 },
       ]).toArray(),
 
       Order.aggregate([{ $match: { status: "pending" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
