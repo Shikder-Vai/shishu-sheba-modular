@@ -19,13 +19,19 @@ exports.getDashboardStats = async (req, res) => {
           { $lte: [{ $dateFromString: { dateString: "$deliveredBy.deliveredTime", onError: new Date(0) } }, end] },
         ],
       };
-      allOrdersMatch.createdAt = { $gte: start, $lte: end };
+      allOrdersMatch.$expr = {
+        $and: [
+          { $gte: [{ $toDate: "$_id" }, start] },
+          { $lte: [{ $toDate: "$_id" }, end] },
+        ],
+      };
     }
 
     if (district && district !== "all") {
-      deliveredMatch["user.district"]  = district;
-      allOrdersMatch["user.district"]  = district;
+      deliveredMatch["user.district"] = district;
+      allOrdersMatch["user.district"] = district;
     }
+
     const [
       deliveredStats,
       totalOrdersResult,
@@ -33,6 +39,10 @@ exports.getDashboardStats = async (req, res) => {
       productPerformance,
       districtWiseOrders,
       customerInsights,
+      pendingResult,
+      approvedResult,
+      processingResult,
+      shippedResult,
     ] = await Promise.all([
       Order.aggregate([
         { $match: deliveredMatch },
@@ -41,9 +51,10 @@ exports.getDashboardStats = async (req, res) => {
             _id: null,
             totalRevenue: { $sum: "$total" },
             deliveredCount: { $sum: 1 },
+            averageDeliveredValue: { $avg: "$total" },
           },
         },
-        { $project: { _id: 0, totalRevenue: 1, deliveredCount: 1 } },
+        { $project: { _id: 0, totalRevenue: 1, deliveredCount: 1, averageDeliveredValue: { $round: ["$averageDeliveredValue", 2] } } },
       ]).toArray(),
 
       Order.aggregate([
@@ -100,18 +111,30 @@ exports.getDashboardStats = async (req, res) => {
         { $sort: { totalSpent: -1 } },
         { $limit: 10 },
       ]).toArray(),
+
+      Order.aggregate([{ $match: { status: "pending" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
+      Order.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
+      Order.aggregate([{ $match: { status: "processing" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
+      Order.aggregate([{ $match: { status: "shipped" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
     ]);
 
-    const delivered = deliveredStats[0] || { totalRevenue: 0, deliveredCount: 0 };
+    const delivered = deliveredStats[0] || { totalRevenue: 0, deliveredCount: 0, averageDeliveredValue: 0 };
     const allOrders = totalOrdersResult[0] || { totalOrders: 0, totalOrdersValue: 0, averageOrderValue: 0 };
 
     res.json({
       salesPerformance: {
         totalRevenue: delivered.totalRevenue,
         averageOrderValue: allOrders.averageOrderValue,
+        averageDeliveredValue: delivered.averageDeliveredValue,
         deliveredCount: delivered.deliveredCount,
         totalOrders: allOrders.totalOrders,
         totalOrdersValue: allOrders.totalOrdersValue,
+      },
+      statusCounts: {
+        pending:    { count: pendingResult[0]?.count || 0, totalValue: pendingResult[0]?.totalValue || 0 },
+        approved:   { count: approvedResult[0]?.count || 0, totalValue: approvedResult[0]?.totalValue || 0 },
+        processing: { count: processingResult[0]?.count || 0, totalValue: processingResult[0]?.totalValue || 0 },
+        shipped:    { count: shippedResult[0]?.count || 0, totalValue: shippedResult[0]?.totalValue || 0 },
       },
       orderStatusSummary,
       productPerformance,
@@ -122,8 +145,6 @@ exports.getDashboardStats = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
-
 
 exports.getSalesPerformance = async (req, res) => {
   try {

@@ -230,13 +230,13 @@ exports.updateOrder = async (req, res) => {
     if (approvedBy) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status, approvedBy } },
+        { $set: { status, approvedBy, approvedAt: new Date() } },
       );
     }
     if (processBy) {
       result = await orderCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { status, processBy } },
+        { $set: { status, processBy, processedAt: new Date() } },
       );
     }
 
