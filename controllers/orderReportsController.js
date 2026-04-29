@@ -43,6 +43,8 @@ exports.getDashboardStats = async (req, res) => {
       approvedResult,
       processingResult,
       shippedResult,
+      cancelResult,
+      returnedResult,
     ] = await Promise.all([
       Order.aggregate([
         { $match: deliveredMatch },
@@ -115,6 +117,8 @@ exports.getDashboardStats = async (req, res) => {
       Order.aggregate([{ $match: { status: "approved" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
       Order.aggregate([{ $match: { status: "processing" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
       Order.aggregate([{ $match: { status: "shipped" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
+      Order.aggregate([{ $match: { status: "cancel" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
+      Order.aggregate([{ $match: { status: "returned" } }, { $group: { _id: null, count: { $sum: 1 }, totalValue: { $sum: "$total" } } }, { $project: { _id: 0, count: 1, totalValue: 1 } }]).toArray(),
     ]);
 
     const delivered = deliveredStats[0] || { totalRevenue: 0, deliveredCount: 0, averageDeliveredValue: 0 };
@@ -134,6 +138,8 @@ exports.getDashboardStats = async (req, res) => {
         approved:   { count: approvedResult[0]?.count || 0, totalValue: approvedResult[0]?.totalValue || 0 },
         processing: { count: processingResult[0]?.count || 0, totalValue: processingResult[0]?.totalValue || 0 },
         shipped:    { count: shippedResult[0]?.count || 0, totalValue: shippedResult[0]?.totalValue || 0 },
+        cancel:     { count: cancelResult[0]?.count || 0, totalValue: cancelResult[0]?.totalValue || 0 },
+        returned:   { count: returnedResult[0]?.count || 0, totalValue: returnedResult[0]?.totalValue || 0 },
       },
       orderStatusSummary,
       productPerformance,
