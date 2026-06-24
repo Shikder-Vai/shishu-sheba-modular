@@ -8,6 +8,69 @@ const inventoryLogCollection = client
   .db("sishuSheba")
   .collection("inventory_logs");
 
+const handleStockTransition = async (order, newStatus) => {
+  if (!order || !newStatus || order.status === newStatus) return;
+
+  const previousStatus = order.status;
+  const isPreviousInactive = previousStatus === "cancel" || previousStatus === "returned";
+  const isNewInactive = newStatus === "cancel" || newStatus === "returned";
+
+  if (isPreviousInactive === isNewInactive) return; // No change in active/inactive status boundary
+
+  if (order.items && Array.isArray(order.items)) {
+    for (const item of order.items) {
+      const { sku, quantity } = item;
+      if (!sku || !quantity) continue;
+
+      const product = await productCollection.findOne({ "variants.sku": sku });
+      if (product && Array.isArray(product.variants)) {
+        const variant = product.variants.find(v => v.sku === sku);
+        if (variant) {
+          const currentStock = typeof variant.stock_quantity === "number" ? variant.stock_quantity : 0;
+          
+          if (isNewInactive) {
+            // Transition to inactive: RESTOCK (+quantity)
+            const newStock = currentStock + quantity;
+            await productCollection.updateOne(
+              { "variants.sku": sku },
+              { $inc: { "variants.$.stock_quantity": quantity } }
+            );
+
+            // Log restock
+            const logEntry = {
+              sku,
+              change_quantity: quantity,
+              new_quantity: newStock,
+              reason: newStatus === "cancel" ? "cancel order" : "Return",
+              orderId: order.orderId,
+              timestamp: new Date(),
+            };
+            await inventoryLogCollection.insertOne(logEntry);
+          } else {
+            // Transition back to active: DEDUCT (-quantity)
+            const newStock = currentStock - quantity;
+            await productCollection.updateOne(
+              { "variants.sku": sku },
+              { $inc: { "variants.$.stock_quantity": -quantity } }
+            );
+
+            // Log deduction
+            const logEntry = {
+              sku,
+              change_quantity: -quantity,
+              new_quantity: newStock,
+              reason: "sale",
+              orderId: order.orderId,
+              timestamp: new Date(),
+            };
+            await inventoryLogCollection.insertOne(logEntry);
+          }
+        }
+      }
+    }
+  }
+};
+
 exports.createOrder = async (req, res) => {
   try {
     const orderData = req.body;
@@ -160,6 +223,15 @@ exports.updateOrder = async (req, res) => {
       shippingNote,
       new_note,
     } = req.body;
+
+    const existingOrder = await orderCollection.findOne({ _id: new ObjectId(id) });
+    if (!existingOrder) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (status && status !== existingOrder.status) {
+      await handleStockTransition(existingOrder, status);
+    }
 
     if (
       status &&
@@ -330,6 +402,15 @@ exports.updateFullOrder = async (req, res) => {
     const { id } = req.params;
     const orderData = req.body;
 
+    const existingOrder = await orderCollection.findOne({ _id: new ObjectId(id) });
+    if (!existingOrder) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (orderData.status && orderData.status !== existingOrder.status) {
+      await handleStockTransition(existingOrder, orderData.status);
+    }
+
     delete orderData._id;
     if (orderData.items) {
       orderData.items = orderData.items.map((item) => {
@@ -497,5 +578,110 @@ exports.getTopSellingProducts = async (req, res) => {
   } catch (error) {
     console.error("Error fetching top selling products:", error);
     res.status(500).json({ error: "Internal Server Error", message: error.message });
+  }
+};
+
+// Background tracking automation worker
+const pathaoKeysCollection = require("../models/pathaoApiKeys.model");
+const carrybeeKeysCollection = require("../models/carrybeeApiKeys.model");
+const steadfastKeysCollection = require("../models/steadfastApiKeys.model");
+const { getValidToken } = require("../services/pathaoService");
+const { getOrderDetails } = require("../services/carrybeeService");
+const axios = require("axios");
+
+exports.autoTrackAllOrders = async () => {
+  console.log("[Auto-Tracking] Starting automated courier status update...");
+  try {
+    const shippingOrders = await orderCollection.find({ status: "shipping" }).toArray();
+    if (shippingOrders.length === 0) {
+      console.log("[Auto-Tracking] No orders in 'shipping' status.");
+      return;
+    }
+
+    console.log(`[Auto-Tracking] Found ${shippingOrders.length} order(s) in 'shipping' status.`);
+
+    const pathaoCreds = await pathaoKeysCollection.findOne({ _id: "default" });
+    const carrybeeCreds = await carrybeeKeysCollection.findOne({ _id: "default" });
+    const steadfastCreds = await steadfastKeysCollection.findOne({ _id: "default" });
+
+    const PATHAO_RETURNED = ["Returned to Merchant", "Return", "Returned", "Return to Courier", "Partially Returned"];
+    const CARRYBEE_RETURNED = ["Return", "Returned", "Returned to Sender", "Partial Return"];
+
+    for (const order of shippingOrders) {
+      const consignmentId = order.consignment_id || order.tracking_code;
+      if (!consignmentId) continue;
+
+      const courier = order.shippingBy?.courier || "steadfast";
+      let newStatus = null;
+
+      try {
+        if (courier === "pathao" && pathaoCreds && pathaoCreds.clientId) {
+          const base = pathaoCreds.baseUrl || "https://api-hermes.pathao.com";
+          const token = await getValidToken(pathaoCreds);
+          const response = await axios.get(
+            `${base}/aladdin/api/v1/orders/${consignmentId}/info`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 10000,
+            }
+          );
+          const orderStatus = response.data?.data?.order_status || "";
+          if (["Delivered", "delivered", "Parcel Delivered"].includes(orderStatus)) {
+            newStatus = "delivered";
+          } else if (PATHAO_RETURNED.some((s) => orderStatus.toLowerCase().includes(s.toLowerCase()))) {
+            newStatus = "returned";
+          }
+        } else if (courier === "carrybee" && carrybeeCreds && carrybeeCreds.clientId) {
+          const cbDetails = await getOrderDetails(consignmentId, carrybeeCreds);
+          const transferStatus = cbDetails?.data?.transfer_status || "";
+          if (["Delivered", "delivered"].includes(transferStatus)) {
+            newStatus = "delivered";
+          } else if (CARRYBEE_RETURNED.some((s) => transferStatus.toLowerCase().includes(s.toLowerCase()))) {
+            newStatus = "returned";
+          }
+        } else if (courier === "steadfast" && steadfastCreds && steadfastCreds.publicKey) {
+          const response = await axios.get(`https://portal.packzy.com/api/v1/status_by_cid/${consignmentId}`, {
+            headers: {
+              "Api-Key": steadfastCreds.publicKey,
+              "Secret-Key": steadfastCreds.secretKey,
+              "Content-Type": "application/json"
+            },
+            timeout: 10000,
+          });
+          if (response.status === 200) {
+            const ds = response.data.delivery_status;
+            if (ds === "delivered") {
+              newStatus = "delivered";
+            } else if (["cancelled", "partial_delivered"].includes(ds)) {
+              newStatus = "returned";
+            }
+          }
+        }
+
+        if (newStatus) {
+          console.log(`[Auto-Tracking] Order ${order.orderId} status changed from 'shipping' to '${newStatus}' via ${courier}`);
+          
+          await handleStockTransition(order, newStatus);
+
+          await orderCollection.updateOne(
+            { _id: order._id },
+            { 
+              $set: { 
+                status: newStatus,
+                ...(newStatus === "delivered" && { deliveredAt: new Date(), autoTracked: true }),
+                ...(newStatus === "returned" && { returnedAt: new Date(), autoTracked: true })
+              } 
+            }
+          );
+        }
+      } catch (err) {
+        console.error(`[Auto-Tracking] Failed to track order ${order.orderId}:`, err.message);
+      }
+    }
+  } catch (error) {
+    console.error("[Auto-Tracking] Error in automated courier tracking worker:", error);
   }
 };
